@@ -65,9 +65,8 @@ QUESTIONS = [
             "Q12": ["Yes"]
         }
     }
-]
-
-# Initialize session state
+    
+]# Initialize session state
 if 'current_question' not in st.session_state:
     st.session_state.current_question = 0
     st.session_state.user_answers = {}
@@ -243,7 +242,7 @@ elif st.session_state.test_started and not st.session_state.test_completed:
         image_path = os.path.join(IMAGE_DIR, q_set['image'])
         if os.path.exists(image_path):
             image = Image.open(image_path)
-            st.image(image, caption=q_set['image'], width=400)
+            st.image(image, caption=q_set['image'], width='stretch')
         else:
             st.error(f"❌ Image not found: {image_path}")
             st.info("Please upload the image file to the `./assets/` directory.")
@@ -314,7 +313,7 @@ elif st.session_state.test_completed:
     """, unsafe_allow_html=True)
     
     total_questions = 0
-    correct_answers = 0
+    correct_count = 0  # 변수명 변경: correct_answers -> correct_count
     
     # 각 이미지별 결과 표시
     for q_set in QUESTIONS:
@@ -326,7 +325,7 @@ elif st.session_state.test_completed:
             image_path = os.path.join(IMAGE_DIR, q_set['image'])
             if os.path.exists(image_path):
                 image = Image.open(image_path)
-                st.image(image, use_container_width=True)
+                st.image(image, width='stretch')
         
         with col2:
             user_ans = st.session_state.user_answers.get(q_set['id'], {})
@@ -337,15 +336,15 @@ elif st.session_state.test_completed:
                 
                 # 정답 가져오기 (Q1, Q4, Q7, Q10 형식)
                 q_number = question['q'].split('.')[0].strip()
-                correct_answers = q_set['answers'].get(q_number, ["Not set"])
+                correct_answers_list = q_set['answers'].get(q_number, ["Not set"])  # 변수명 변경
                 
-                is_correct = check_answer(user_answer, correct_answers, question['type'])
+                is_correct = check_answer(user_answer, correct_answers_list, question['type'])
                 total_questions += 1
                 if is_correct:
-                    correct_answers += 1
+                    correct_count += 1  # 변수명 변경
                 
                 # 정답 표시용 (첫 번째 정답만 표시)
-                display_answer = correct_answers[0] if isinstance(correct_answers, list) else correct_answers
+                display_answer = correct_answers_list[0] if isinstance(correct_answers_list, list) else correct_answers_list
                 
                 if is_correct:
                     st.markdown(f"""
@@ -366,11 +365,11 @@ elif st.session_state.test_completed:
         st.divider()
     
     # Final Score
-    percentage = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+    percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
     
     st.markdown(f"""
     <div class="main-header">
-        <h2>Final Score: {correct_answers}/{total_questions}</h2>
+        <h2>Final Score: {correct_count}/{total_questions}</h2>
         <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
     </div>
     """, unsafe_allow_html=True)

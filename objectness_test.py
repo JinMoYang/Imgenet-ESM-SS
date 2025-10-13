@@ -147,7 +147,7 @@ def check_answer(user_answer, correct_answers, q_type):
     return False
 
 # Main App
-st.set_page_config(page_title="COCO Image Annotation Test", page_icon="🖼️", layout="wide")
+st.set_page_config(page_title="COCO Objectness Test", page_icon="🖼️", layout="wide")
 
 # Custom CSS
 st.markdown("""

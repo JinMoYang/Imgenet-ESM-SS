@@ -1,25 +1,5 @@
-# streamlit_app.py
 import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-
-st.title("COCO Test Dashboard")
-
-# 노트북 코드를 여기에 복사
-# 단, print() → st.write()
-# plt.show() → st.pyplot(fig)
-"""
-Annotator Qualification Test - Part 1: COCO Label Understanding
-30 Multiple Choice Questions
-
-Usage with Voila:
-1. Save this as 'coco_test.ipynb'
-2. Run: voila coco_test.ipynb
-3. Code will be hidden, only UI will be visible
-"""
-
-import ipywidgets as widgets
-from IPython.display import display, HTML, clear_output
+import time
 
 # Quiz Data
 QUESTIONS = [
@@ -235,243 +215,231 @@ QUESTIONS = [
     }
 ]
 
-class COCOQualificationTest:
-    def __init__(self):
-        self.current_question = 0
-        self.user_answers = []
-        self.score = 0
-        
-        # UI Components
-        self.output = widgets.Output()
-        self.question_output = widgets.Output()
-        self.setup_ui()
-        
-    def setup_ui(self):
-        """Initialize UI components"""
-        # Progress bar
-        self.progress = widgets.IntProgress(
-            value=0,
-            min=0,
-            max=len(QUESTIONS),
-            description='Progress:',
-            bar_style='info',
-            style={'bar_color': '#4CAF50'},
-            layout=widgets.Layout(width='100%')
-        )
-        
-        # Question container
-        self.question_label = widgets.HTML()
-        
-        # Radio buttons for options
-        self.radio_options = widgets.RadioButtons(
-            options=[],
-            layout=widgets.Layout(width='100%'),
-            style={'description_width': '0px'}
-        )
-        
-        # Submit button
-        self.submit_btn = widgets.Button(
-            description='Submit Answer',
-            button_style='primary',
-            icon='check',
-            layout=widgets.Layout(width='200px', height='40px')
-        )
-        self.submit_btn.on_click(self.submit_answer)
-        
-    def display_question(self):
-        """Display current question"""
-        with self.question_output:
-            clear_output()
-            
-            if self.current_question >= len(QUESTIONS):
-                self.show_results()
-                return
-            
-            q = QUESTIONS[self.current_question]
-            
-            # Update progress
-            self.progress.value = self.current_question
-            self.progress.description = f'Question {self.current_question + 1}/{len(QUESTIONS)}'
-            
-            # Question HTML
-            question_html = f"""
-            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        padding: 25px; border-radius: 10px; color: white; margin: 20px 0;'>
-                <h2 style='margin: 0 0 10px 0;'>Question {q['id']}</h2>
-                <p style='font-size: 18px; line-height: 1.6; margin: 0;'>
-                    {q['definition']}
-                </p>
-                <p style='margin: 15px 0 0 0; font-size: 14px; opacity: 0.9;'>
-                    Category: {q['category']}
-                </p>
-            </div>
-            """
-            self.question_label.value = question_html
-            
-            # Update options
-            self.radio_options.options = q['options']
-            self.radio_options.value = None
-            
-            # Display components
-            display(self.progress)
-            display(self.question_label)
-            display(self.radio_options)
-            display(self.submit_btn)
+# Initialize session state
+if 'current_question' not in st.session_state:
+    st.session_state.current_question = 0
+    st.session_state.user_answers = []
+    st.session_state.score = 0
+    st.session_state.test_started = False
+    st.session_state.test_completed = False
+    st.session_state.selected_answer = None
+    st.session_state.show_feedback = False
+
+def start_test():
+    st.session_state.test_started = True
+    st.session_state.current_question = 0
+    st.session_state.user_answers = []
+    st.session_state.score = 0
+    st.session_state.test_completed = False
+    st.session_state.selected_answer = None
+    st.session_state.show_feedback = False
+
+def submit_answer():
+    if st.session_state.selected_answer is None:
+        st.warning("⚠️ Please select an answer before submitting!")
+        return
     
-    def submit_answer(self, btn):
-        """Handle answer submission"""
-        if self.radio_options.value is None:
-            with self.output:
-                clear_output()
-                display(HTML("""
-                <div style='background: #fff3cd; padding: 15px; border-radius: 5px; 
-                            border-left: 5px solid #ffc107; margin: 10px 0;'>
-                    <strong>⚠️ Please select an answer before submitting!</strong>
-                </div>
-                """))
-            return
-        
-        # Record answer
-        q = QUESTIONS[self.current_question]
-        user_answer = self.radio_options.value
-        is_correct = user_answer == q['answer']
-        
-        self.user_answers.append({
-            'question_id': q['id'],
-            'user_answer': user_answer,
-            'correct_answer': q['answer'],
-            'is_correct': is_correct
-        })
-        
+    q = QUESTIONS[st.session_state.current_question]
+    user_answer = st.session_state.selected_answer
+    is_correct = user_answer == q['answer']
+    
+    st.session_state.user_answers.append({
+        'question_id': q['id'],
+        'user_answer': user_answer,
+        'correct_answer': q['answer'],
+        'is_correct': is_correct
+    })
+    
+    if is_correct:
+        st.session_state.score += 1
+    
+    st.session_state.show_feedback = True
+
+def next_question():
+    st.session_state.current_question += 1
+    st.session_state.selected_answer = None
+    st.session_state.show_feedback = False
+    
+    if st.session_state.current_question >= len(QUESTIONS):
+        st.session_state.test_completed = True
+
+def restart_test():
+    st.session_state.current_question = 0
+    st.session_state.user_answers = []
+    st.session_state.score = 0
+    st.session_state.test_started = False
+    st.session_state.test_completed = False
+    st.session_state.selected_answer = None
+    st.session_state.show_feedback = False
+
+# Main App
+st.set_page_config(page_title="COCO Label Understanding Test", page_icon="📝", layout="wide")
+
+# Custom CSS
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .question-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
+        color: white;
+        margin: 1rem 0;
+    }
+    .success-box {
+        background: #d4edda;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 5px solid #28a745;
+        margin: 1rem 0;
+    }
+    .error-box {
+        background: #f8d7da;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 5px solid #dc3545;
+        margin: 1rem 0;
+    }
+    .result-box {
+        background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    .failed-box {
+        background: linear-gradient(135deg, #f44336 0%, #e57373 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin: 2rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Welcome Screen
+if not st.session_state.test_started:
+    st.markdown("""
+    <div class="main-header">
+        <h1>📝 COCO Label Understanding Test</h1>
+        <p style="font-size: 18px;">Test your knowledge of COCO dataset categories</p>
+        <p style="font-size: 16px; opacity: 0.9;">30 Questions | 90% Required to Pass</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.info("""
+    ### 📋 Instructions
+    - Read each definition carefully
+    - Select the correct COCO category from the options
+    - Click "Submit Answer" to check your answer
+    - You need to score 90% (27/30) to pass this test
+    - You will see immediate feedback after each answer
+    """)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.button("Start Test", on_click=start_test, type="primary", use_container_width=True)
+
+# Test in Progress
+elif st.session_state.test_started and not st.session_state.test_completed:
+    q = QUESTIONS[st.session_state.current_question]
+    
+    # Progress bar
+    progress = st.session_state.current_question / len(QUESTIONS)
+    st.progress(progress)
+    st.write(f"**Question {st.session_state.current_question + 1} / {len(QUESTIONS)}**")
+    
+    # Question
+    st.markdown(f"""
+    <div class="question-box">
+        <h2>Question {q['id']}</h2>
+        <p style="font-size: 18px; line-height: 1.6;">{q['definition']}</p>
+        <p style="margin-top: 15px; font-size: 14px; opacity: 0.9;">Category: {q['category']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Options
+    st.session_state.selected_answer = st.radio(
+        "Select your answer:",
+        q['options'],
+        key=f"q_{st.session_state.current_question}",
+        index=None if st.session_state.selected_answer is None else q['options'].index(st.session_state.selected_answer) if st.session_state.selected_answer in q['options'] else None
+    )
+    
+    # Feedback
+    if st.session_state.show_feedback:
+        is_correct = st.session_state.user_answers[-1]['is_correct']
         if is_correct:
-            self.score += 1
-        
-        # Show feedback
-        with self.output:
-            clear_output()
-            if is_correct:
-                display(HTML("""
-                <div style='background: #d4edda; padding: 15px; border-radius: 5px; 
-                            border-left: 5px solid #28a745; margin: 10px 0;'>
-                    <strong style='color: #155724;'>✅ Correct!</strong>
-                </div>
-                """))
-            else:
-                display(HTML(f"""
-                <div style='background: #f8d7da; padding: 15px; border-radius: 5px; 
-                            border-left: 5px solid #dc3545; margin: 10px 0;'>
-                    <strong style='color: #721c24;'>❌ Incorrect!</strong><br>
-                    <span style='color: #721c24;'>The correct answer is: <strong>{q['answer']}</strong></span>
-                </div>
-                """))
-        
-        # Move to next question after short delay
-        self.current_question += 1
-        
-        # Clear output and show next question
-        import time
-        time.sleep(1.5)
-        
-        with self.output:
-            clear_output()
-        
-        with self.question_output:
-            clear_output()
-            self.display_question()
-    
-    def show_results(self):
-        """Display final results"""
-        with self.question_output:
-            clear_output()
-            
-            percentage = (self.score / len(QUESTIONS)) * 100
-            passed = percentage >= 90  # 90% to pass
-            
-            # Result summary
-            result_html = f"""
-            <div style='background: linear-gradient(135deg, {"#4CAF50" if passed else "#f44336"} 0%, {"#81C784" if passed else "#e57373"} 100%); 
-                        padding: 40px; border-radius: 15px; color: white; text-align: center; margin: 30px 0;'>
-                <h1 style='margin: 0 0 20px 0; font-size: 48px;'>
-                    {"🎉 PASSED!" if passed else "❌ FAILED"}
-                </h1>
-                <h2 style='margin: 0 0 10px 0;'>Your Score: {self.score}/{len(QUESTIONS)}</h2>
-                <p style='font-size: 24px; margin: 0;'>Percentage: {percentage:.1f}%</p>
-                <p style='margin: 20px 0 0 0; font-size: 16px; opacity: 0.9;'>
-                    {"Congratulations! You may proceed to Part 2." if passed else "Please review the COCO categories and try again. You need 80% to pass."}
-                </p>
+            st.markdown("""
+            <div class="success-box">
+                <strong style="color: #155724;">✅ Correct!</strong>
             </div>
-            """
-            display(HTML(result_html))
-            
-            # Detailed results
-            details_html = """
-            <div style='background: white; padding: 25px; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;'>
-                <h3 style='margin: 0 0 20px 0; color: #333;'>📊 Detailed Results</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <thead>
-                        <tr style='background: #f5f5f5;'>
-                            <th style='padding: 12px; text-align: left; border-bottom: 2px solid #ddd;'>Q</th>
-                            <th style='padding: 12px; text-align: left; border-bottom: 2px solid #ddd;'>Your Answer</th>
-                            <th style='padding: 12px; text-align: left; border-bottom: 2px solid #ddd;'>Correct Answer</th>
-                            <th style='padding: 12px; text-align: center; border-bottom: 2px solid #ddd;'>Result</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
-            for ans in self.user_answers:
-                result_icon = "✅" if ans['is_correct'] else "❌"
-                row_color = "#f1f8f4" if ans['is_correct'] else "#fef5f5"
-                details_html += f"""
-                <tr style='background: {row_color};'>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>{ans['question_id']}</td>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>{ans['user_answer']}</td>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>{ans['correct_answer']}</td>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: center;'>{result_icon}</td>
-                </tr>
-                """
-            
-            details_html += """
-                    </tbody>
-                </table>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="error-box">
+                <strong style="color: #721c24;">❌ Incorrect!</strong><br>
+                <span style="color: #721c24;">The correct answer is: <strong>{q['answer']}</strong></span>
             </div>
-            """
-            display(HTML(details_html))
+            """, unsafe_allow_html=True)
+        
+        st.button("Next Question →", on_click=next_question, type="primary")
+    else:
+        st.button("Submit Answer", on_click=submit_answer, type="primary")
+
+# Results Screen
+elif st.session_state.test_completed:
+    percentage = (st.session_state.score / len(QUESTIONS)) * 100
+    passed = percentage >= 90
     
-    def start(self):
-        """Start the test"""
-        # Welcome screen
-        welcome_html = """
-        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 40px; border-radius: 15px; color: white; text-align: center; margin: 30px 0;'>
-            <h1 style='margin: 0 0 20px 0; font-size: 42px;'>📝 COCO Label Understanding Test</h1>
-            <p style='font-size: 18px; margin: 0 0 10px 0;'>Test your knowledge of COCO dataset categories</p>
-            <p style='font-size: 16px; margin: 0; opacity: 0.9;'>30 Questions | 90% Required to Pass</p>
+    # Result summary
+    if passed:
+        st.markdown(f"""
+        <div class="result-box">
+            <h1 style="font-size: 48px; margin-bottom: 20px;">🎉 PASSED!</h1>
+            <h2>Your Score: {st.session_state.score}/{len(QUESTIONS)}</h2>
+            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
+            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
+                Congratulations! You may proceed to Part 2.
+            </p>
         </div>
-        
-        <div style='background: #e3f2fd; padding: 20px; border-radius: 10px; margin: 20px 0;'>
-            <h3 style='margin: 0 0 15px 0; color: #1976d2;'>📋 Instructions</h3>
-            <ul style='margin: 0; padding-left: 20px; line-height: 1.8;'>
-                <li>Read each definition carefully</li>
-                <li>Select the correct COCO category from the options</li>
-                <li>Click "Submit Answer" to proceed to the next question</li>
-                <li>You need to score 90% (27/30) to pass this test</li>
-                <li>You will see immediate feedback after each answer</li>
-            </ul>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="failed-box">
+            <h1 style="font-size: 48px; margin-bottom: 20px;">❌ FAILED</h1>
+            <h2>Your Score: {st.session_state.score}/{len(QUESTIONS)}</h2>
+            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
+            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
+                Please review the COCO categories and try again. You need 90% to pass.
+            </p>
         </div>
-        """
-        display(HTML(welcome_html))
-        
-        # Display first question
-        with self.question_output:
-            self.display_question()
-        
-        display(self.question_output)
-        display(self.output)
-
-
-# Run the test
-if __name__ == "__main__":
-    test = COCOQualificationTest()
-    test.start()
+        """, unsafe_allow_html=True)
+    
+    # Detailed results
+    st.subheader("📊 Detailed Results")
+    
+    results_data = []
+    for ans in st.session_state.user_answers:
+        results_data.append({
+            "Question": ans['question_id'],
+            "Your Answer": ans['user_answer'],
+            "Correct Answer": ans['correct_answer'],
+            "Result": "✅" if ans['is_correct'] else "❌"
+        })
+    
+    st.dataframe(results_data, use_container_width=True)
+    
+    # Restart button
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.button("Restart Test", on_click=restart_test, type="primary", use_container_width=True)

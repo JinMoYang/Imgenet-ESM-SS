@@ -99,93 +99,6 @@ COCO_CATEGORIES = {
     88: "teddy bear", 89: "hair drier", 90: "toothbrush"
 }
 
-def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
-    """Evaluate user submission with detailed debugging"""
-    debug_info = {
-        'gt_mask_loaded': False,
-        'gt_mask_shape': None,
-        'gt_mask_nonzero': 0,
-        'user_annotations_count': 0,
-        'masks_generated': 0,
-        'best_iou_details': {}
-    }
-    
-    # Debug: Check GT mask
-    if ground_truth_mask is not None:
-        debug_info['gt_mask_loaded'] = True
-        debug_info['gt_mask_shape'] = ground_truth_mask.shape
-        debug_info['gt_mask_nonzero'] = np.count_nonzero(ground_truth_mask)
-    else:
-        return {
-            'passed': False,
-            'iou': 0.0,
-            'class_match': False,
-            'matched_annotation': None,
-            'matched_mask': None,
-            'error': 'Ground truth mask is None',
-            'debug_info': debug_info
-        }
-    
-    if 'annotations' not in user_json or len(user_json['annotations']) == 0:
-        return {
-            'passed': False,
-            'iou': 0.0,
-            'class_match': False,
-            'matched_annotation': None,
-            'matched_mask': None,
-            'error': 'No annotations found in JSON',
-            'debug_info': debug_info
-        }
-    
-    debug_info['user_annotations_count'] = len(user_json['annotations'])
-    
-    best_iou = 0.0
-    best_annotation = None
-    best_mask = None
-    
-    actual_gt_shape = ground_truth_mask.shape
-    
-    for idx, ann in enumerate(user_json['annotations']):
-        try:
-            user_mask = polygon_to_mask(ann['segmentation'], actual_gt_shape)
-            debug_info['masks_generated'] += 1
-            
-            # Debug: Check user mask
-            user_mask_nonzero = np.count_nonzero(user_mask)
-            
-            iou = calculate_iou(user_mask, ground_truth_mask)
-            
-            debug_info[f'ann_{idx}'] = {
-                'user_mask_shape': user_mask.shape,
-                'user_mask_nonzero': user_mask_nonzero,
-                'iou': iou,
-                'category_id': ann.get('category_id', 'N/A')
-            }
-            
-            if iou > best_iou:
-                best_iou = iou
-                best_annotation = ann
-                best_mask = user_mask
-                debug_info['best_iou_details'] = {
-                    'annotation_idx': idx,
-                    'iou': iou,
-                    'intersection': np.logical_and(user_mask, ground_truth_mask).sum(),
-                    'union': np.logical_or(user_mask, ground_truth_mask).sum()
-                }
-        except Exception as e:
-            debug_info[f'ann_{idx}_error'] = str(e)
-            continue
-    
-    if best_annotation is None:
-        return {
-            'passed': False,
-            'iou': 0.0,
-            'class_match': False,
-            'matched_annotation': None,
-            'matched_mask': None,import streamlit as st
-
-
-
 # Helper Functions
 def convert_labelme_to_coco(labelme_json):
     """Convert LabelMe format to COCO format - merge shapes with same group_id"""
@@ -557,22 +470,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                     pass
             
             st.image(display_image, width="stretch")
-            
-            # DEBUG: Show Ground Truth
-            st.markdown("---")
-            st.caption("🔍 Debug: Ground Truth Mask")
-            try:
-                gt_mask = load_ground_truth(q['ground_truth'])
-                if gt_mask is not None:
-                    st.success(f"✅ GT loaded: shape={gt_mask.shape}, nonzero pixels={np.count_nonzero(gt_mask)}")
-                    # Show GT overlay
-                    gt_overlay = image_np.copy()
-                    gt_overlay[gt_mask > 0] = gt_overlay[gt_mask > 0] * 0.6 + np.array([255, 0, 0]) * 0.4
-                    st.image(gt_overlay, caption="Ground Truth (Red)", width="stretch")
-                else:
-                    st.error("❌ GT mask is None")
-            except Exception as e:
-                st.error(f"❌ GT loading error: {str(e)}")
             
             import io
             buf = io.BytesIO()

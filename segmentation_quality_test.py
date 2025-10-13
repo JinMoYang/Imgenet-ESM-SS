@@ -749,7 +749,7 @@ elif st.session_state.seg_test_completed:
             "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
         })
     
-    st.dataframe(summary_data, width=None)
+    st.dataframe(summary_data, use_container_width=True)
     
     # Restart button
     col1, col2, col3 = st.columns([1, 1, 1])

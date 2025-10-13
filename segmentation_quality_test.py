@@ -234,7 +234,6 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
         return {
             'passed': False,
             'iou': 0.0,
-            'class_match': False,
             'matched_annotation': None,
             'error': 'No annotations found in JSON'
         }
@@ -262,20 +261,17 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
         return {
             'passed': False,
             'iou': 0.0,
-            'class_match': False,
             'matched_annotation': None,
             'matched_mask': None,
             'error': 'Failed to process annotations'
         }
     
     user_category = get_category_name(best_annotation['category_id'], user_json)
-    class_match = (user_category.lower() == gt_category.lower())
-    passed = (best_iou >= 0.9) and class_match
+    passed = (best_iou >= 0.9)  # IoU만으로 평가
     
     return {
         'passed': passed,
         'iou': best_iou,
-        'class_match': class_match,
         'matched_annotation': best_annotation,
         'matched_mask': best_mask,
         'user_category': user_category,
@@ -555,7 +551,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             with st.expander("📄 View JSON"):
                 st.json(st.session_state.seg_uploaded_jsons[q_id])
 
-# Final Results
 elif st.session_state.seg_test_completed:
     st.markdown("""
     <div class="main-header">
@@ -592,7 +587,6 @@ elif st.session_state.seg_test_completed:
                 'question': q,
                 'passed': False,
                 'iou': 0.0,
-                'class_match': False,
                 'matched_mask': None,
                 'error': 'No submission'
             })
@@ -602,37 +596,32 @@ elif st.session_state.seg_test_completed:
     
     # 통과 여부에 따라 다른 UI
     if passed:
-        st.success(f"🎉 Gread SCORE! {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
+        st.success(f"🎉 Great Score! {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
         
         st.balloons()
         
         st.markdown("""
-        ### 🎊 축하합니다!
+        ### 🎊 Congratulations!
         
-        모든 시험을 완벽하게 통과하셨습니다!
+        You have successfully passed all tests!
     
-        - Segmentation annotation 작업을 계속 진행할 준비가 되셨습니다.    
+        You are now ready to proceed with the segmentation annotation work.
         ---
         """)
         
         # 통과시에만 상세 결과 표시 (expander 안에)
-        with st.expander("📋 상세 결과 보기"):
+        with st.expander("📋 View Detailed Results"):
             for result in results:
                 q = result['question']
                 
                 st.markdown(f"**Question {result['question_id']}: {q['ground_truth']['category']}** - ✅ PASS")
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 
                 with col1:
                     st.metric("IoU", f"{result['iou']:.4f}")
                 
                 with col2:
-                    st.metric("Category", "✅")
-                    st.caption(f"Expected: {q['ground_truth']['category']}")
-                    st.caption(f"Got: {result.get('user_category', 'N/A')}")
-                
-                with col3:
                     st.metric("Result", "✅ PASS")
                 
                 st.markdown("---")
@@ -640,36 +629,30 @@ elif st.session_state.seg_test_completed:
         # 통과시 재시작 버튼
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            st.button("🔄 다시 시도하기", on_click=restart_seg_test, type="secondary", use_container_width=True)
+            st.button("🔄 Try Again", on_click=restart_seg_test, type="secondary", use_container_width=True)
             
     else:
         st.error(f"❌ Score: {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
         
         st.markdown("""
-        ### 😢 아쉽게도 통과하지 못했습니다
+        ### 😢 Test Not Passed
         
-        다시 한번 시도해보세요!
+        Please try again!
         """)
         
-        st.subheader("📋 상세 결과")
+        st.subheader("📋 Detailed Results")
         
         for result in results:
             q = result['question']
             
             with st.expander(f"Question {result['question_id']}: {q['ground_truth']['category']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 
                 with col1:
                     st.metric("IoU", f"{result['iou']:.4f}")
                 
                 with col2:
-                    st.metric("Category", "✅" if result['class_match'] else "❌")
-                    if 'user_category' in result:
-                        st.caption(f"Expected: {q['ground_truth']['category']}")
-                        st.caption(f"Got: {result.get('user_category', 'N/A')}")
-                
-                with col3:
                     st.metric("Result", "✅ PASS" if result['passed'] else "❌ FAIL")
                 
                 if result.get('matched_mask') is not None:
@@ -708,7 +691,6 @@ elif st.session_state.seg_test_completed:
                 "Question": result['question_id'],
                 "Category": result['question']['ground_truth']['category'],
                 "IoU": f"{result['iou']:.4f}" if result['iou'] > 0 else "N/A",
-                "Match": "✅" if result.get('class_match') else "❌",
                 "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
             })
         

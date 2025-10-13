@@ -373,13 +373,30 @@ elif st.session_state.test_completed:
     # Final Score
     percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
     
-    st.markdown(f"""
-    <div class="main-header">
-        <h2>Final Score: {correct_count}/{total_questions}</h2>
-        <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
-    </div>
-    """, unsafe_allow_html=True)
     
+    if percentage >= 90:
+        st.markdown(f"""
+        <div class="result-box">
+            <h1 style="font-size: 48px; margin-bottom: 20px;">🎉 PASSED!</h1>
+            <h2>Final Score: {correct_count}/{total_questions}</h2>
+            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
+            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
+                Congratulations! You may proceed to segmentation test.
+                <a href="https://imgenet-esm-ss-jwhx7jqm8mzruffwaychzi.streamlit.app/" target="_blank" style="color: #155724; text-decoration: underline;">Click here to proceed to segmentation test</a>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="failed-box">
+            <h1 style="font-size: 48px; margin-bottom: 20px;">❌ FAILED</h1>
+            <h2>Final Score: {correct_count}/{total_questions}</h2>
+            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
+            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
+                Please review and try again. You need 90% to pass.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     # Restart button
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:

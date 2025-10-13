@@ -325,8 +325,11 @@ def visualize_comparison(image, pred_mask, gt_mask):
 # Initialize session state
 if 'seg_current_question' not in st.session_state:
     st.session_state.seg_current_question = 0
+if 'seg_uploaded_jsons' not in st.session_state:
     st.session_state.seg_uploaded_jsons = {}  # {question_id: json_data}
+if 'seg_test_started' not in st.session_state:
     st.session_state.seg_test_started = False
+if 'seg_test_completed' not in st.session_state:
     st.session_state.seg_test_completed = False
 
 def start_seg_test():

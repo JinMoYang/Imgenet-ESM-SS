@@ -13,14 +13,14 @@ QUESTIONS = [
         "questions": [
             {"q": "Q1. How many objects do you need to annotate?", "type": "number"},
             {"q": "Q2. Write down all the object classes you found.", "type": "text"},
-            {"q": "Q3. Is the class found in Q2 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "No"]}
+            {"q": "Q3. Is the classes found in Q2 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "Yes, partially","No"]}
         ],
         # 정답을 여기에 추가 (나중에 수정 가능)
         # 여러 답안 인정: 리스트로 작성
         "answers": {
-            "Q1": [2],  # 숫자는 리스트로
-            "Q2": ["dog, person", "person, dog", "dog and person"],  # 여러 표현 가능
-            "Q3": ["Yes", "yes", "YES"]  # 대소문자 모두 허용
+            "Q1": [5],  # 숫자는 리스트로
+            "Q2": ["lemon"],  # 여러 표현 가능
+            "Q3": ["No"]  # 대소문자 모두 허용
         }
     },
     {
@@ -29,12 +29,12 @@ QUESTIONS = [
         "questions": [
             {"q": "Q4. How many objects do you need to annotate?", "type": "number"},
             {"q": "Q5. Write down all the object classes you found.", "type": "text"},
-            {"q": "Q6. Is the class found in Q5 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "No"]}
+            {"q": "Q6. Is the classes found in Q5 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "Yes, partially","No"]}
         ],
         "answers": {
-            "Q4": [1],
-            "Q5": ["car", "vehicle", "automobile"],
-            "Q6": ["Yes", "yes"]
+            "Q4": [5],
+            "Q5": ["Broccoli, Bell Peppers, Garlic"],
+            "Q6": ["No"]
         }
     },
     {
@@ -43,12 +43,12 @@ QUESTIONS = [
         "questions": [
             {"q": "Q7. How many objects do you need to annotate?", "type": "number"},
             {"q": "Q8. Write down all the object classes you found.", "type": "text"},
-            {"q": "Q9. Is the class found in Q8 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "No"]}
+            {"q": "Q9. Is the classes found in Q8 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "Yes, partially","No"]}
         ],
         "answers": {
-            "Q7": [3],
-            "Q8": ["cup, bottle, spoon", "bottle, cup, spoon", "spoon, cup, bottle"],
-            "Q9": ["Yes", "yes"]
+            "Q7": [12],
+            "Q8": ["spoon"],
+            "Q9": ["Yes",]
         }
     },
     {
@@ -57,12 +57,12 @@ QUESTIONS = [
         "questions": [
             {"q": "Q10. How many objects do you need to annotate?", "type": "number"},
             {"q": "Q11. Write down all the object classes you found.", "type": "text"},
-            {"q": "Q12. Is the class found in Q11 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "No"]}
+            {"q": "Q12. Is the classes found in Q11 in the COCO taxonomy?", "type": "radio", "options": ["Yes", "Yes, partially","No"]}
         ],
         "answers": {
-            "Q10": [1],
-            "Q11": ["airplane", "plane", "aircraft"],
-            "Q12": ["Yes", "yes"]
+            "Q10": [3],
+            "Q11": ["Person, Sports ball"],
+            "Q12": ["Yes"]
         }
     }
 ]

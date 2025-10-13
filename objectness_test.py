@@ -243,7 +243,7 @@ elif st.session_state.test_started and not st.session_state.test_completed:
         image_path = os.path.join(IMAGE_DIR, q_set['image'])
         if os.path.exists(image_path):
             image = Image.open(image_path)
-            st.image(image, caption=q_set['image'], use_container_width=True)
+            st.image(image, caption=q_set['image'], width=400)
         else:
             st.error(f"❌ Image not found: {image_path}")
             st.info("Please upload the image file to the `./assets/` directory.")

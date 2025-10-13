@@ -98,8 +98,10 @@ COCO_CATEGORIES = {
     82: "refrigerator", 84: "book", 85: "clock", 86: "vase", 87: "scissors",
     88: "teddy bear", 89: "hair drier", 90: "toothbrush"
 }
+
+# Helper Functions
 def convert_labelme_to_coco(labelme_json):
-    """Convert LabelMe format to COCO format"""
+    """Convert LabelMe format to COCO format - merge shapes with same group_id"""
     if 'shapes' in labelme_json:
         # This is LabelMe format, convert to COCO
         coco_json = {
@@ -110,9 +112,22 @@ def convert_labelme_to_coco(labelme_json):
         category_map = {}
         category_id = 1
         
-        for idx, shape in enumerate(labelme_json['shapes']):
+        # Group shapes by group_id and label
+        grouped_shapes = {}
+        for shape in labelme_json['shapes']:
             label = shape.get('label', 'unknown')
+            group_id = shape.get('group_id', None)
             
+            # Create key for grouping
+            key = (label, group_id if group_id is not None else id(shape))
+            
+            if key not in grouped_shapes:
+                grouped_shapes[key] = []
+            grouped_shapes[key].append(shape)
+        
+        # Convert each group to one annotation
+        ann_id = 1
+        for (label, group_id), shapes in grouped_shapes.items():
             # Add category if not exists
             if label not in category_map:
                 category_map[label] = category_id
@@ -123,40 +138,46 @@ def convert_labelme_to_coco(labelme_json):
                 })
                 category_id += 1
             
-            # Convert points to COCO segmentation format
-            points = shape.get('points', [])
-            if len(points) >= 3:  # Need at least 3 points for polygon
-                # Flatten points: [[x1,y1], [x2,y2]] -> [x1,y1,x2,y2]
-                flat_points = []
-                for point in points:
-                    flat_points.extend([float(point[0]), float(point[1])])
-                
-                # Calculate bbox
-                xs = [point[0] for point in points]
-                ys = [point[1] for point in points]
-                x_min, x_max = min(xs), max(xs)
-                y_min, y_max = min(ys), max(ys)
+            # Collect all polygons from this group
+            all_polygons = []
+            all_xs = []
+            all_ys = []
+            
+            for shape in shapes:
+                points = shape.get('points', [])
+                if len(points) >= 3:
+                    # Flatten points
+                    flat_points = []
+                    for point in points:
+                        flat_points.extend([float(point[0]), float(point[1])])
+                        all_xs.append(point[0])
+                        all_ys.append(point[1])
+                    
+                    all_polygons.append(flat_points)
+            
+            if all_polygons and all_xs and all_ys:
+                # Calculate bbox from all points
+                x_min, x_max = min(all_xs), max(all_xs)
+                y_min, y_max = min(all_ys), max(all_ys)
                 bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
-                
-                # Calculate area (approximate)
                 area = (x_max - x_min) * (y_max - y_min)
                 
                 coco_json['annotations'].append({
-                    'id': idx + 1,
+                    'id': ann_id,
                     'image_id': 1,
                     'category_id': category_map[label],
-                    'segmentation': [flat_points],
+                    'segmentation': all_polygons,  # Multiple polygons for one object
                     'area': area,
                     'bbox': bbox,
                     'iscrowd': 0
                 })
+                ann_id += 1
         
         return coco_json
     else:
         # Already COCO format
         return labelme_json
 
-# Helper Functions
 def polygon_to_mask(segmentation, image_shape):
     """Convert COCO polygon format to binary mask"""
     height, width = image_shape
@@ -222,9 +243,12 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
     best_annotation = None
     best_mask = None
     
+    # Get actual ground truth shape
+    actual_gt_shape = ground_truth_mask.shape
+    
     for ann in user_json['annotations']:
         try:
-            user_mask = polygon_to_mask(ann['segmentation'], image_shape)
+            user_mask = polygon_to_mask(ann['segmentation'], actual_gt_shape)
             iou = calculate_iou(user_mask, ground_truth_mask)
             
             if iou > best_iou:
@@ -546,13 +570,13 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 st.error("❌ Invalid JSON file. Please upload a valid JSON.")
             except Exception as e:
                 st.error(f"❌ Error reading file: {str(e)}")
-            
+        
         elif q_id in st.session_state.seg_uploaded_jsons:
             st.success("✅ JSON already uploaded for this question")
             
             with st.expander("📄 View uploaded JSON"):
                 st.json(st.session_state.seg_uploaded_jsons[q_id])
-        
+    
     # Instant Visualization Section
     if q_id in st.session_state.seg_uploaded_jsons:
         st.markdown("---")
@@ -561,18 +585,23 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
         
         try:
             user_json = st.session_state.seg_uploaded_jsons[q_id]
-            image_np = np.array(Image.open(q['image_path']))
+            image_pil = Image.open(q['image_path'])
+            image_np = np.array(image_pil)
+            
+            # Get actual image shape
+            actual_shape = image_np.shape[:2]  # (height, width)
             
             # Create visualization for all annotations or best one
             if 'annotations' in user_json and len(user_json['annotations']) > 0:
                 
                 # Combine all masks
-                combined_mask = np.zeros(q['ground_truth']['image_shape'], dtype=np.uint8)
+                combined_mask = np.zeros(actual_shape, dtype=np.uint8)
                 for ann in user_json['annotations']:
                     try:
-                        mask = polygon_to_mask(ann['segmentation'], q['ground_truth']['image_shape'])
+                        mask = polygon_to_mask(ann['segmentation'], actual_shape)
                         combined_mask = np.logical_or(combined_mask, mask).astype(np.uint8)
-                    except:
+                    except Exception as e:
+                        st.warning(f"Could not process one annotation: {str(e)}")
                         continue
                 
                 overlay = visualize_user_mask(image_np, combined_mask)
@@ -683,7 +712,6 @@ elif st.session_state.seg_test_completed:
             with col2:
                 st.metric("Category Match", "✅" if result['class_match'] else "❌")
                 if not result['class_match'] and 'user_category' in result:
-                    st.caption(f"Expected: {q['ground_truth']['category']}")
                     st.caption(f"Got: {result.get('user_category', 'unknown')}")
             
             with col3:

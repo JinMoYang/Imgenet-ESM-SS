@@ -507,11 +507,8 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                             st.image(gt_overlay, caption="Ground Truth Mask Overlay", width="stretch")
                         
                         # Show raw mask
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            st.image(gt_mask * 255, caption="Raw GT Mask", width="stretch")
-                        with col_b:
-                            st.image(image_np, caption="Original Image", width="stretch")
+                        st.image(gt_mask * 255, caption="Raw GT Mask", width="stretch")
+
                     else:
                         st.error("❌ Failed to load GT mask")
                 except Exception as e:

@@ -195,7 +195,7 @@ st.markdown("""
 if not st.session_state.test_started:
     st.markdown("""
     <div class="main-header">
-        <h1>🖼️ COCO Image Annotation Test</h1>
+        <h1>🖼️ COCO Objectness Test</h1>
         <p style="font-size: 18px;">Identify objects in images and verify COCO taxonomy knowledge</p>
         <p style="font-size: 16px; opacity: 0.9;">4 Image Sets | Multiple Questions per Image</p>
     </div>

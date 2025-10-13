@@ -16,66 +16,66 @@ SEGMENTATION_QUESTIONS = [
             "image_shape": (480, 640)  # (height, width)
         }
     },
-    {
-        "id": 2,
-        "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
-            "category": "dog",
-            "image_shape": (480, 640)
-        }
-    },
-    {
-        "id": 3,
-        "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
-            "category": "car",
-            "image_shape": (480, 640)
-        }
-    },
-    {
-        "id": 4,
-        "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
-            "category": "cat",
-            "image_shape": (480, 640)
-        }
-    },
-    {
-        "id": 5,
-        "image_path": "./assets/ILSVRC2012_val_00030960.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00030960_gt.png",
-            "category": "chair",
-            "image_shape": (480, 640)
-        }
-    },
-    {
-        "id": 6,
-        "image_path": "./assets/ILSVRC2012_val_00035508.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00035508_gt.png",
-            "category": "bicycle",
-            "image_shape": (480, 640)
-        }
-    },
-    {
-        "id": 7,
-        "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
-        "ground_truth": {
-            "type": "mask",
-            "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
-            "category": "bottle",
-            "image_shape": (480, 640)
-        }
-    }
+    # {
+    #     "id": 2,
+    #     "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
+    #         "category": "dog",
+    #         "image_shape": (480, 640)
+    #     }
+    # },
+    # {
+    #     "id": 3,
+    #     "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
+    #         "category": "car",
+    #         "image_shape": (480, 640)
+    #     }
+    # },
+    # {
+    #     "id": 4,
+    #     "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
+    #         "category": "cat",
+    #         "image_shape": (480, 640)
+    #     }
+    # },
+    # {
+    #     "id": 5,
+    #     "image_path": "./assets/ILSVRC2012_val_00030960.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00030960_gt.png",
+    #         "category": "chair",
+    #         "image_shape": (480, 640)
+    #     }
+    # },
+    # {
+    #     "id": 6,
+    #     "image_path": "./assets/ILSVRC2012_val_00035508.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00035508_gt.png",
+    #         "category": "bicycle",
+    #         "image_shape": (480, 640)
+    #     }
+    # },
+    # {
+    #     "id": 7,
+    #     "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",
+    #         "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
+    #         "category": "bottle",
+    #         "image_shape": (480, 640)
+    #     }
+    # }
 ]
 
 # COCO Categories mapping

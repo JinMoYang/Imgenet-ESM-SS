@@ -185,6 +185,7 @@ def load_png_mask(file_path):
     try:
         mask = Image.open(file_path).convert('L')
         mask = np.array(mask)
+        st.write(mask)
         return (mask > 127).astype(np.uint8)
     except Exception as e:
         st.error(f"Error loading mask: {str(e)}")

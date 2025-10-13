@@ -22,7 +22,7 @@ SEGMENTATION_QUESTIONS = [
         "ground_truth": {
             "type": "mask",
             "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
-            "category": "dog",
+            "category": "sports ball",
             "image_shape": (480, 640)
         }
     },
@@ -32,7 +32,7 @@ SEGMENTATION_QUESTIONS = [
         "ground_truth": {
             "type": "mask",
             "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
-            "category": "car",
+            "category": "refrigerator",
             "image_shape": (480, 640)
         }
     },
@@ -341,6 +341,7 @@ def start_seg_test():
 
 def go_to_question(q_idx):
     st.session_state.seg_current_question = q_idx
+    st.rerun()
 
 def submit_all_answers():
     st.session_state.seg_test_completed = True

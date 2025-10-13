@@ -103,7 +103,6 @@ COCO_CATEGORIES = {
 def convert_labelme_to_coco(labelme_json):
     """Convert LabelMe format to COCO format - merge shapes with same group_id"""
     if 'shapes' in labelme_json:
-        # This is LabelMe format, convert to COCO
         coco_json = {
             'annotations': [],
             'categories': []
@@ -117,8 +116,6 @@ def convert_labelme_to_coco(labelme_json):
         for shape in labelme_json['shapes']:
             label = shape.get('label', 'unknown')
             group_id = shape.get('group_id', None)
-            
-            # Create key for grouping
             key = (label, group_id if group_id is not None else id(shape))
             
             if key not in grouped_shapes:
@@ -128,7 +125,6 @@ def convert_labelme_to_coco(labelme_json):
         # Convert each group to one annotation
         ann_id = 1
         for (label, group_id), shapes in grouped_shapes.items():
-            # Add category if not exists
             if label not in category_map:
                 category_map[label] = category_id
                 coco_json['categories'].append({
@@ -138,7 +134,6 @@ def convert_labelme_to_coco(labelme_json):
                 })
                 category_id += 1
             
-            # Collect all polygons from this group
             all_polygons = []
             all_xs = []
             all_ys = []
@@ -146,17 +141,14 @@ def convert_labelme_to_coco(labelme_json):
             for shape in shapes:
                 points = shape.get('points', [])
                 if len(points) >= 3:
-                    # Flatten points
                     flat_points = []
                     for point in points:
                         flat_points.extend([float(point[0]), float(point[1])])
                         all_xs.append(point[0])
                         all_ys.append(point[1])
-                    
                     all_polygons.append(flat_points)
             
             if all_polygons and all_xs and all_ys:
-                # Calculate bbox from all points
                 x_min, x_max = min(all_xs), max(all_xs)
                 y_min, y_max = min(all_ys), max(all_ys)
                 bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
@@ -166,7 +158,7 @@ def convert_labelme_to_coco(labelme_json):
                     'id': ann_id,
                     'image_id': 1,
                     'category_id': category_map[label],
-                    'segmentation': all_polygons,  # Multiple polygons for one object
+                    'segmentation': all_polygons,
                     'area': area,
                     'bbox': bbox,
                     'iscrowd': 0
@@ -175,7 +167,6 @@ def convert_labelme_to_coco(labelme_json):
         
         return coco_json
     else:
-        # Already COCO format
         return labelme_json
 
 def polygon_to_mask(segmentation, image_shape):
@@ -210,7 +201,7 @@ def calculate_iou(pred_mask, gt_mask):
     return float(intersection / union)
 
 def get_category_name(category_id, user_json):
-    """Get category name from category_id using user's categories list"""
+    """Get category name from category_id"""
     if 'categories' in user_json:
         for cat in user_json['categories']:
             if cat['id'] == category_id:
@@ -229,7 +220,7 @@ def load_ground_truth(gt_data):
     return None
 
 def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
-    """Evaluate user submission - Find best matching annotation by IoU"""
+    """Evaluate user submission"""
     if 'annotations' not in user_json or len(user_json['annotations']) == 0:
         return {
             'passed': False,
@@ -243,7 +234,6 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
     best_annotation = None
     best_mask = None
     
-    # Get actual ground truth shape
     actual_gt_shape = ground_truth_mask.shape
     
     for ann in user_json['annotations']:
@@ -256,6 +246,7 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
                 best_annotation = ann
                 best_mask = user_mask
         except Exception as e:
+            st.warning(f"Error processing annotation: {str(e)}")
             continue
     
     if best_annotation is None:
@@ -264,6 +255,7 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
             'iou': 0.0,
             'class_match': False,
             'matched_annotation': None,
+            'matched_mask': None,
             'error': 'Failed to process annotations'
         }
     
@@ -282,7 +274,7 @@ def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
     }
 
 def visualize_user_mask(image, user_mask):
-    """Visualize user's mask overlay on image (NO ground truth comparison)"""
+    """Visualize user's mask overlay"""
     if image is None or user_mask is None:
         return None
     
@@ -292,13 +284,12 @@ def visualize_user_mask(image, user_mask):
         image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
     
     overlay = image.copy()
-    # Show user mask in semi-transparent blue
     overlay[user_mask > 0] = overlay[user_mask > 0] * 0.6 + np.array([0, 120, 255]) * 0.4
     
     return overlay.astype(np.uint8)
 
 def visualize_comparison(image, pred_mask, gt_mask):
-    """Visualize prediction vs ground truth (for final evaluation)"""
+    """Visualize prediction vs ground truth"""
     if image is None or pred_mask is None or gt_mask is None:
         return None
     
@@ -309,15 +300,12 @@ def visualize_comparison(image, pred_mask, gt_mask):
     
     overlay = image.copy()
     
-    # True Positive (green)
     tp = np.logical_and(pred_mask, gt_mask)
     overlay[tp] = overlay[tp] * 0.5 + np.array([0, 255, 0]) * 0.5
     
-    # False Positive (red)
     fp = np.logical_and(pred_mask, ~gt_mask.astype(bool))
     overlay[fp] = overlay[fp] * 0.5 + np.array([255, 0, 0]) * 0.5
     
-    # False Negative (blue)
     fn = np.logical_and(~pred_mask.astype(bool), gt_mask)
     overlay[fn] = overlay[fn] * 0.5 + np.array([0, 0, 255]) * 0.5
     
@@ -326,7 +314,7 @@ def visualize_comparison(image, pred_mask, gt_mask):
 # Main App
 st.set_page_config(page_title="Segmentation Annotation Test", page_icon="🎯", layout="wide")
 
-# Initialize session state - MUST be before any usage
+# Initialize session state
 if 'seg_current_question' not in st.session_state:
     st.session_state.seg_current_question = 0
 if 'seg_uploaded_jsons' not in st.session_state:
@@ -346,7 +334,6 @@ def go_to_question(q_idx):
     st.session_state.seg_current_question = q_idx
 
 def submit_all_answers():
-    """Final submission - evaluate all answers"""
     st.session_state.seg_test_completed = True
 
 def restart_seg_test():
@@ -354,9 +341,6 @@ def restart_seg_test():
     st.session_state.seg_uploaded_jsons = {}
     st.session_state.seg_test_started = False
     st.session_state.seg_test_completed = False
-
-# Main App
-st.set_page_config(page_title="Segmentation Annotation Test", page_icon="🎯", layout="wide")
 
 # Custom CSS
 st.markdown("""
@@ -376,36 +360,6 @@ st.markdown("""
         color: white;
         margin: 1rem 0;
     }
-    .success-box {
-        background: #d4edda;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #28a745;
-        margin: 1rem 0;
-    }
-    .error-box {
-        background: #f8d7da;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #dc3545;
-        margin: 1rem 0;
-    }
-    .info-box {
-        background: #d1ecf1;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #17a2b8;
-        margin: 1rem 0;
-    }
-    .sidebar-question {
-        padding: 0.5rem;
-        margin: 0.3rem 0;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    .sidebar-question:hover {
-        background-color: #f0f0f0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -413,49 +367,20 @@ st.markdown("""
 if not st.session_state.seg_test_started:
     st.markdown("""
     <div class="main-header">
-        <h1>🎯 Part 2: Segmentation Annotation Test</h1>
+        <h1>🎯 Segmentation Annotation Test</h1>
         <p style="font-size: 18px;">Upload your COCO format annotations for evaluation</p>
-        <p style="font-size: 16px; opacity: 0.9;">7 Questions | IoU ≥ 0.9 Required | 100% Pass Rate</p>
+        <p style="font-size: 16px; opacity: 0.9;">1 Question | IoU ≥ 0.9 Required</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
     ### 📋 Instructions
     - Navigate freely between questions using the sidebar
-    - For each image, upload a **COCO format JSON file** with your annotations
-    - Your JSON can contain **multiple objects** (multiple annotations)
-    - The system will automatically find the **best matching annotation** by IoU
+    - Upload a **COCO or LabelMe format JSON file**
     - See your mask visualization **instantly** upon upload
-    - To pass each question:
-      - IoU must be ≥ 0.9
-      - Category must match exactly
-    - Click **"Submit All Answers"** when ready for final evaluation
-    - You must pass **ALL 7 questions** to complete the test
+    - Click **"Submit All Answers"** for final evaluation
+    - To pass: IoU ≥ 0.9 AND category must match
     """)
-    
-    st.markdown("### 📄 Expected JSON Format")
-    st.code("""
-{
-    "annotations": [
-        {
-            "id": 1,
-            "image_id": 1,
-            "category_id": 1,
-            "segmentation": [[x1, y1, x2, y2, x3, y3, ...]],
-            "area": 1234,
-            "bbox": [x, y, width, height],
-            "iscrowd": 0
-        }
-    ],
-    "categories": [
-        {
-            "id": 1,
-            "name": "person",
-            "supercategory": "person"
-        }
-    ]
-}
-    """, language="json")
     
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -464,17 +389,20 @@ if not st.session_state.seg_test_started:
 # Test in Progress
 elif st.session_state.seg_test_started and not st.session_state.seg_test_completed:
     
+    # Safety check
+    if st.session_state.seg_current_question >= len(SEGMENTATION_QUESTIONS):
+        st.session_state.seg_current_question = 0
+        st.rerun()
+    
     # Sidebar Navigation
     with st.sidebar:
         st.markdown("### 📑 Question Navigation")
         
-        # Progress overview
         completed_count = len(st.session_state.seg_uploaded_jsons)
         st.metric("Progress", f"{completed_count}/{len(SEGMENTATION_QUESTIONS)}")
         
         st.markdown("---")
         
-        # Question list
         for idx, q in enumerate(SEGMENTATION_QUESTIONS):
             is_current = (idx == st.session_state.seg_current_question)
             has_upload = q['id'] in st.session_state.seg_uploaded_jsons
@@ -483,7 +411,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             button_type = "primary" if is_current else "secondary"
             
             if st.button(
-                f"{status} Question {q['id']}", 
+                f"{status} Question {q['id']}: {q['ground_truth']['category']}", 
                 key=f"nav_{idx}",
                 type=button_type,
                 disabled=is_current,
@@ -493,32 +421,24 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
         
         st.markdown("---")
         
-        # Submit button in sidebar
         if completed_count == len(SEGMENTATION_QUESTIONS):
-            st.success(f"✅ All {len(SEGMENTATION_QUESTIONS)} questions completed!")
+            st.success(f"✅ All questions completed!")
             if st.button("📤 Submit All Answers", type="primary", width="stretch"):
                 submit_all_answers()
-        elif st.session_state.seg_test_started and not st.session_state.seg_test_completed:
-            # Safety check
-            if st.session_state.seg_current_question >= len(SEGMENTATION_QUESTIONS):
-                st.session_state.seg_current_question = 0
-                st.rerun()
         else:
-            st.warning(f"⚠️ {len(SEGMENTATION_QUESTIONS) - completed_count} questions remaining")
+            st.warning(f"⚠️ {len(SEGMENTATION_QUESTIONS) - completed_count} remaining")
     
     # Main content
     q = SEGMENTATION_QUESTIONS[st.session_state.seg_current_question]
     q_id = q['id']
     
-    # Question header
     st.markdown(f"""
     <div class="question-box">
         <h2>Question {q['id']} of {len(SEGMENTATION_QUESTIONS)}</h2>
-        <p style="font-size: 14px; opacity: 0.9;">Upload your annotation JSON to see instant visualization</p>
+        <p style="font-size: 16px;">Expected Category: <strong>{q['ground_truth']['category']}</strong></p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Two column layout
     col1, col2 = st.columns([1, 1])
     
     with col1:
@@ -527,7 +447,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             image = Image.open(q['image_path'])
             image_np = np.array(image)
             
-            # Show overlay if JSON is uploaded, otherwise show original
             display_image = image_np
             if q_id in st.session_state.seg_uploaded_jsons:
                 try:
@@ -535,7 +454,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                     actual_shape = image_np.shape[:2]
                     
                     if 'annotations' in user_json and len(user_json['annotations']) > 0:
-                        # Combine all masks
                         combined_mask = np.zeros(actual_shape, dtype=np.uint8)
                         for ann in user_json['annotations']:
                             try:
@@ -553,7 +471,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             
             st.image(display_image, width="stretch")
             
-            # Download button
             import io
             buf = io.BytesIO()
             image.save(buf, format='PNG')
@@ -572,60 +489,46 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
     with col2:
         st.subheader("📤 Upload Annotation")
         
-        # File uploader
         uploaded_file = st.file_uploader(
             "Choose a JSON file",
             type=['json'],
             key=f"upload_{q_id}",
-            help="Upload COCO format annotation JSON"
+            help="Upload COCO or LabelMe format JSON"
         )
         
         if uploaded_file is not None:
             try:
-                # Parse JSON
                 user_json = json.load(uploaded_file)
-                
-                # Convert LabelMe to COCO format if needed
                 user_json = convert_labelme_to_coco(user_json)
-                
-                # Save to session state
                 st.session_state.seg_uploaded_jsons[q_id] = user_json
                 
                 st.success("✅ File uploaded successfully!")
                 
-                # Show format detection
-                if 'shapes' in json.loads(uploaded_file.getvalue().decode()):
-                    st.info("📝 Detected LabelMe format - automatically converted to COCO format")
-                
-                with st.expander("📄 View uploaded JSON"):
-                    st.json(user_json)
-                
                 num_annotations = len(user_json.get('annotations', []))
-                st.info(f"📊 Found {num_annotations} annotation(s) in your file")
+                st.info(f"📊 Found {num_annotations} annotation(s)")
+                
+                with st.expander("📄 View JSON"):
+                    st.json(user_json)
                 
                 st.rerun()
                 
-            except json.JSONDecodeError:
-                st.error("❌ Invalid JSON file. Please upload a valid JSON.")
             except Exception as e:
-                st.error(f"❌ Error reading file: {str(e)}")
+                st.error(f"❌ Error: {str(e)}")
         
         elif q_id in st.session_state.seg_uploaded_jsons:
-            st.success("✅ JSON already uploaded for this question")
+            st.success("✅ JSON already uploaded")
             
-            with st.expander("📄 View uploaded JSON"):
+            with st.expander("📄 View JSON"):
                 st.json(st.session_state.seg_uploaded_jsons[q_id])
 
-# Final Results Screen
+# Final Results
 elif st.session_state.seg_test_completed:
     st.markdown("""
     <div class="main-header">
         <h1>📊 Final Evaluation Results</h1>
-        <p style="font-size: 18px;">Comparing your annotations with ground truth</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Evaluate all submissions
     results = []
     score = 0
     
@@ -656,62 +559,41 @@ elif st.session_state.seg_test_completed:
                 'passed': False,
                 'iou': 0.0,
                 'class_match': False,
+                'matched_mask': None,
                 'error': 'No submission'
             })
     
-    # Summary
     percentage = (score / len(SEGMENTATION_QUESTIONS)) * 100
     passed = score == len(SEGMENTATION_QUESTIONS)
     
     if passed:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%); padding: 2rem; border-radius: 10px; color: white; text-align: center; margin: 2rem 0;">
-            <h1 style="font-size: 48px; margin-bottom: 20px;">🎉 PERFECT SCORE!</h1>
-            <h2>Your Score: {score}/{len(SEGMENTATION_QUESTIONS)}</h2>
-            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
-            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
-                Congratulations! You have completed the Segmentation Annotation Test successfully!
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.success(f"🎉 PERFECT SCORE! {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
     else:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #f44336 0%, #e57373 100%); padding: 2rem; border-radius: 10px; color: white; text-align: center; margin: 2rem 0;">
-            <h1 style="font-size: 48px; margin-bottom: 20px;">❌ INCOMPLETE</h1>
-            <h2>Your Score: {score}/{len(SEGMENTATION_QUESTIONS)}</h2>
-            <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
-            <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
-                You must pass ALL questions. Please try again.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.error(f"❌ Score: {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
     
-    # Detailed Results
-    st.subheader("📋 Question-by-Question Results")
+    st.subheader("📋 Detailed Results")
     
     for result in results:
         q = result['question']
         
-        with st.expander(f"Question {result['question_id']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
+        with st.expander(f"Question {result['question_id']}: {q['ground_truth']['category']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric("IoU Score", f"{result['iou']:.4f}")
+                st.metric("IoU", f"{result['iou']:.4f}")
             
             with col2:
-                st.metric("Category Match", "✅" if result['class_match'] else "❌")
-                if not result['class_match'] and 'user_category' in result:
+                st.metric("Category", "✅" if result['class_match'] else "❌")
+                if 'user_category' in result:
                     st.caption(f"Expected: {q['ground_truth']['category']}")
-                    st.caption(f"Got: {result.get('user_category', 'unknown')}")
+                    st.caption(f"Got: {result.get('user_category', 'N/A')}")
             
             with col3:
                 st.metric("Result", "✅ PASS" if result['passed'] else "❌ FAIL")
             
-            # Visualization with ground truth comparison
             if result.get('matched_mask') is not None:
                 st.markdown("---")
-                st.markdown("**Ground Truth Comparison**")
                 st.caption("🟢 Green: Correct | 🔴 Red: False Positive | 🔵 Blue: False Negative")
                 
                 try:
@@ -735,14 +617,10 @@ elif st.session_state.seg_test_completed:
                             st.markdown("**Comparison**")
                             st.image(overlay, width="stretch")
                 except Exception as e:
-                    st.warning(f"Could not generate visualization: {str(e)}")
-            
-            elif result.get('error'):
-                st.error(f"Error: {result['error']}")
+                    st.warning(f"Visualization error: {str(e)}")
     
-    # Summary Table
     st.markdown("---")
-    st.subheader("📊 Summary Table")
+    st.subheader("📊 Summary")
     
     summary_data = []
     for result in results:
@@ -750,13 +628,12 @@ elif st.session_state.seg_test_completed:
             "Question": result['question_id'],
             "Category": result['question']['ground_truth']['category'],
             "IoU": f"{result['iou']:.4f}" if result['iou'] > 0 else "N/A",
-            "Category Match": "✅" if result.get('class_match') else "❌",
+            "Match": "✅" if result.get('class_match') else "❌",
             "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
         })
     
-    st.dataframe(summary_data, width='stretch')
+    st.dataframe(summary_data, width="stretch")
     
-    # Restart button
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.button("🔄 Restart Test", on_click=restart_seg_test, type="primary", width="stretch")
+        st.button("🔄 Restart", on_click=restart_seg_test, type="primary", width="stretch")

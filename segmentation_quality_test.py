@@ -98,7 +98,6 @@ COCO_CATEGORIES = {
     82: "refrigerator", 84: "book", 85: "clock", 86: "vase", 87: "scissors",
     88: "teddy bear", 89: "hair drier", 90: "toothbrush"
 }
-
 # Helper Functions
 def convert_labelme_to_coco(labelme_json):
     """Convert LabelMe format to COCO format - merge shapes with same group_id"""
@@ -477,7 +476,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             button_type = "primary" if is_current else "secondary"
             
             if st.button(
-                f"{status} Question {q['id']}", 
+                f"{status} Question {q['id']}: {q['ground_truth']['category']}", 
                 key=f"nav_{idx}",
                 type=button_type,
                 disabled=is_current,
@@ -503,6 +502,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
     st.markdown(f"""
     <div class="question-box">
         <h2>Question {q['id']} of {len(SEGMENTATION_QUESTIONS)}</h2>
+        <p style="font-size: 16px;">Expected Category: <strong>{q['ground_truth']['category']}</strong></p>
         <p style="font-size: 14px; opacity: 0.9;">Upload your annotation JSON to see instant visualization</p>
     </div>
     """, unsafe_allow_html=True)
@@ -514,7 +514,33 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
         st.subheader("📷 Test Image")
         try:
             image = Image.open(q['image_path'])
-            st.image(image, width="stretch")
+            image_np = np.array(image)
+            
+            # Show overlay if JSON is uploaded, otherwise show original
+            display_image = image_np
+            if q_id in st.session_state.seg_uploaded_jsons:
+                try:
+                    user_json = st.session_state.seg_uploaded_jsons[q_id]
+                    actual_shape = image_np.shape[:2]
+                    
+                    if 'annotations' in user_json and len(user_json['annotations']) > 0:
+                        # Combine all masks
+                        combined_mask = np.zeros(actual_shape, dtype=np.uint8)
+                        for ann in user_json['annotations']:
+                            try:
+                                mask = polygon_to_mask(ann['segmentation'], actual_shape)
+                                combined_mask = np.logical_or(combined_mask, mask).astype(np.uint8)
+                            except:
+                                continue
+                        
+                        overlay = visualize_user_mask(image_np, combined_mask)
+                        if overlay is not None:
+                            display_image = overlay
+                            st.caption("🎨 Showing your annotation overlay")
+                except:
+                    pass
+            
+            st.image(display_image, width="stretch")
             
             # Download button
             import io
@@ -576,55 +602,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             
             with st.expander("📄 View uploaded JSON"):
                 st.json(st.session_state.seg_uploaded_jsons[q_id])
-    
-    # Instant Visualization Section
-    if q_id in st.session_state.seg_uploaded_jsons:
-        st.markdown("---")
-        st.subheader("🎨 Your Annotation Visualization")
-        st.caption("This shows YOUR segmentation mask overlaid on the image (blue). Evaluation will happen after final submission.")
-        
-        try:
-            user_json = st.session_state.seg_uploaded_jsons[q_id]
-            image_pil = Image.open(q['image_path'])
-            image_np = np.array(image_pil)
-            
-            # Get actual image shape
-            actual_shape = image_np.shape[:2]  # (height, width)
-            
-            # Create visualization for all annotations or best one
-            if 'annotations' in user_json and len(user_json['annotations']) > 0:
-                
-                # Combine all masks
-                combined_mask = np.zeros(actual_shape, dtype=np.uint8)
-                for ann in user_json['annotations']:
-                    try:
-                        mask = polygon_to_mask(ann['segmentation'], actual_shape)
-                        combined_mask = np.logical_or(combined_mask, mask).astype(np.uint8)
-                    except Exception as e:
-                        st.warning(f"Could not process one annotation: {str(e)}")
-                        continue
-                
-                overlay = visualize_user_mask(image_np, combined_mask)
-                
-                if overlay is not None:
-                    col_viz1, col_viz2 = st.columns(2)
-                    
-                    with col_viz1:
-                        st.markdown("**Original Image**")
-                        st.image(image_np, width="stretch")
-                    
-                    with col_viz2:
-                        st.markdown("**Your Mask Overlay**")
-                        st.image(overlay, width="stretch")
-                    
-                    st.info(f"💡 Showing {len(user_json['annotations'])} annotation(s) from your JSON")
-                else:
-                    st.warning("Could not generate visualization")
-            else:
-                st.warning("No annotations found in the JSON file")
-                
-        except Exception as e:
-            st.error(f"Error generating visualization: {str(e)}")
 
 # Final Results Screen
 elif st.session_state.seg_test_completed:
@@ -712,6 +689,7 @@ elif st.session_state.seg_test_completed:
             with col2:
                 st.metric("Category Match", "✅" if result['class_match'] else "❌")
                 if not result['class_match'] and 'user_category' in result:
+                    st.caption(f"Expected: {q['ground_truth']['category']}")
                     st.caption(f"Got: {result.get('user_category', 'unknown')}")
             
             with col3:

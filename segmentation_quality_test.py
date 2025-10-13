@@ -5,74 +5,73 @@ from PIL import Image, ImageDraw
 import cv2
 
 # Ground Truth Data - 정답 데이터 (여기에 실제 데이터를 넣으세요)
-
 SEGMENTATION_QUESTIONS = [
     {
         "id": 1,
-        "image_path": "assets/ILSVRC2012_val_00001953.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00001953.JPEG",
         "ground_truth": {
             "type": "mask",  # "mask" or "json"
-            "mask_path": "assets/ILSVRC2012_val_00001953_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00001953_gt.png",
             "category": "person",
             "image_shape": (480, 640)  # (height, width)
         }
     },
     {
         "id": 2,
-        "image_path": "assets/ILSVRC2012_val_00007612.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/q2_mask.png",
+            "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
             "category": "dog",
             "image_shape": (480, 640)
         }
     },
     {
         "id": 3,
-        "image_path": "assets/ILSVRC2012_val_00013722.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/ILSVRC2012_val_00013722_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
             "category": "car",
             "image_shape": (480, 640)
         }
     },
     {
         "id": 4,
-        "image_path": "assets/ILSVRC2012_val_00021098.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/ILSVRC2012_val_00021098_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
             "category": "cat",
             "image_shape": (480, 640)
         }
     },
     {
-        "id": 5,        
-        "image_path": "assets/ILSVRC2012_val_00030960.JPEG",
+        "id": 5,
+        "image_path": "./assets/ILSVRC2012_val_00030960.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/ILSVRC2012_val_00030960_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00030960_gt.png",
             "category": "chair",
             "image_shape": (480, 640)
         }
     },
     {
         "id": 6,
-        "image_path": "assets/ILSVRC2012_val_00035508.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00035508.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/ILSVRC2012_val_00035508_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00035508_gt.png",
             "category": "bicycle",
             "image_shape": (480, 640)
         }
     },
     {
         "id": 7,
-        "image_path": "assets/ILSVRC2012_val_00045093.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
         "ground_truth": {
             "type": "mask",
-            "mask_path": "assets/ILSVRC2012_val_00045093_gt.png",
+            "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
             "category": "bottle",
             "image_shape": (480, 640)
         }
@@ -401,6 +400,20 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
         try:
             image = Image.open(q['image_path'])
             st.image(image, use_container_width=True)
+            
+            # Download button for the image
+            import io
+            buf = io.BytesIO()
+            image.save(buf, format='PNG')
+            buf.seek(0)
+            
+            st.download_button(
+                label="⬇️ Download Image",
+                data=buf,
+                file_name=f"question_{q['id']}_image.png",
+                mime="image/png",
+                use_container_width=True
+            )
         except Exception as e:
             st.error(f"Error loading image: {str(e)}")
             st.info("📁 Please ensure test images are in the correct path")

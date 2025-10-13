@@ -16,36 +16,36 @@ SEGMENTATION_QUESTIONS = [
     #         "image_shape": (480, 640)  # (height, width)
     #     }
     # },
-    # {
-    #     "id": 1,
-    #     "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
-    #         "category": "sports ball",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
-    # {
-    #     "id": 2,
-    #     "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
-    #         "category": "refrigerator",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
-    # {
-    #     "id": 3,
-    #     "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
-    #         "category": "orange/banana",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
+    {
+        "id": 1,
+        "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
+        "ground_truth": {
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
+            "category": "sports ball",
+            "image_shape": (480, 640)
+        }
+    },
+    {
+        "id": 2,
+        "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
+        "ground_truth": {
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
+            "category": "refrigerator",
+            "image_shape": (480, 640)
+        }
+    },
+    {
+        "id": 3,
+        "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
+        "ground_truth": {
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
+            "category": "orange/banana",
+            "image_shape": (480, 640)
+        }
+    },
     # {
     #     "id": 5,
     #     "image_path": "./assets/ILSVRC2012_val_00030960.JPEG",

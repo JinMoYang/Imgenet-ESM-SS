@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Voila 설치
+pip install voila
+
+# Jupyter 확장 활성화
+jupyter serverextension enable voila --sys-prefix

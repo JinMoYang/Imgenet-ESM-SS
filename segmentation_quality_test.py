@@ -7,7 +7,17 @@ import cv2
 # Ground Truth Data - 정답 데이터 (여기에 실제 데이터를 넣으세요)
 SEGMENTATION_QUESTIONS = [
     {
-        "id": 1,
+    "id": 1,
+    "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
+    "ground_truth": {
+        "type": "mask",
+        "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
+        "category": "bottle",
+        "image_shape": (480, 640)
+        }
+    },
+    {
+        "id": 2,
         "image_path": "./assets/ILSVRC2012_val_00001953.JPEG",
         "ground_truth": {
             "type": "mask",  # "mask" or "json"
@@ -66,15 +76,7 @@ SEGMENTATION_QUESTIONS = [
     #         "image_shape": (480, 640)
     #     }
     # },
-    # {
-    #     "id": 7,
-    #     "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
-    #         "category": "bottle",
-    #         "image_shape": (480, 640)
-    #     }
+
     # }
 ]
 
@@ -599,74 +601,121 @@ elif st.session_state.seg_test_completed:
     percentage = (score / len(SEGMENTATION_QUESTIONS)) * 100
     passed = score == len(SEGMENTATION_QUESTIONS)
     
+    # 통과 여부에 따라 다른 UI
     if passed:
-        st.success(f"🎉 PERFECT SCORE! {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
-    else:
-        st.error(f"❌ Score: {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
-    
-    st.subheader("📋 Detailed Results")
-    
-    for result in results:
-        q = result['question']
+        st.success(f"🎉 Gread SCORE! {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
         
-        with st.expander(f"Question {result['question_id']}: {q['ground_truth']['category']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("IoU", f"{result['iou']:.4f}")
-            
-            with col2:
-                st.metric("Category", "✅" if result['class_match'] else "❌")
-                if 'user_category' in result:
+        st.balloons()
+        
+        st.markdown("""
+        ### 🎊 축하합니다!
+        
+        모든 시험을 완벽하게 통과하셨습니다!
+    
+        - Segmentation annotation 작업을 계속 진행할 준비가 되셨습니다.    
+        ---
+        """)
+        
+        # 통과시에만 상세 결과 표시 (expander 안에)
+        with st.expander("📋 상세 결과 보기"):
+            for result in results:
+                q = result['question']
+                
+                st.markdown(f"**Question {result['question_id']}: {q['ground_truth']['category']}** - ✅ PASS")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("IoU", f"{result['iou']:.4f}")
+                
+                with col2:
+                    st.metric("Category", "✅")
                     st.caption(f"Expected: {q['ground_truth']['category']}")
                     st.caption(f"Got: {result.get('user_category', 'N/A')}")
-            
-            with col3:
-                st.metric("Result", "✅ PASS" if result['passed'] else "❌ FAIL")
-            
-            if result.get('matched_mask') is not None:
-                st.markdown("---")
-                st.caption("🟢 Green: Correct | 🔴 Red: False Positive | 🔵 Blue: False Negative")
                 
-                try:
-                    image_np = np.array(Image.open(q['image_path']))
-                    gt_mask = load_ground_truth(q['ground_truth'])
-                    overlay = visualize_comparison(image_np, result['matched_mask'], gt_mask)
+                with col3:
+                    st.metric("Result", "✅ PASS")
+                
+                st.markdown("---")
+        
+        # 통과시 재시작 버튼
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.button("🔄 다시 시도하기", on_click=restart_seg_test, type="secondary", use_container_width=True)
+            
+    else:
+        st.error(f"❌ Score: {score}/{len(SEGMENTATION_QUESTIONS)} ({percentage:.1f}%)")
+        
+        st.markdown("""
+        ### 😢 아쉽게도 통과하지 못했습니다
+        
+        다시 한번 시도해보세요!
+        """)
+        
+        st.subheader("📋 상세 결과")
+        
+        for result in results:
+            q = result['question']
+            
+            with st.expander(f"Question {result['question_id']}: {q['ground_truth']['category']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("IoU", f"{result['iou']:.4f}")
+                
+                with col2:
+                    st.metric("Category", "✅" if result['class_match'] else "❌")
+                    if 'user_category' in result:
+                        st.caption(f"Expected: {q['ground_truth']['category']}")
+                        st.caption(f"Got: {result.get('user_category', 'N/A')}")
+                
+                with col3:
+                    st.metric("Result", "✅ PASS" if result['passed'] else "❌ FAIL")
+                
+                if result.get('matched_mask') is not None:
+                    st.markdown("---")
+                    st.caption("🟢 Green: Correct | 🔴 Red: False Positive | 🔵 Blue: False Negative")
                     
-                    if overlay is not None:
-                        col_a, col_b, col_c = st.columns(3)
+                    try:
+                        image_np = np.array(Image.open(q['image_path']))
+                        gt_mask = load_ground_truth(q['ground_truth'])
+                        overlay = visualize_comparison(image_np, result['matched_mask'], gt_mask)
                         
-                        with col_a:
-                            st.markdown("**Original**")
-                            st.image(image_np, width="stretch")
-                        
-                        with col_b:
-                            st.markdown("**Your Mask**")
-                            user_viz = visualize_user_mask(image_np, result['matched_mask'])
-                            st.image(user_viz, width="stretch")
-                        
-                        with col_c:
-                            st.markdown("**Comparison**")
-                            st.image(overlay, width="stretch")
-                except Exception as e:
-                    st.warning(f"Visualization error: {str(e)}")
-    
-    st.markdown("---")
-    st.subheader("📊 Summary")
-    
-    summary_data = []
-    for result in results:
-        summary_data.append({
-            "Question": result['question_id'],
-            "Category": result['question']['ground_truth']['category'],
-            "IoU": f"{result['iou']:.4f}" if result['iou'] > 0 else "N/A",
-            "Match": "✅" if result.get('class_match') else "❌",
-            "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
-        })
-    
-    st.dataframe(summary_data, width="stretch")
-    
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        st.button("🔄 Restart", on_click=restart_seg_test, type="primary", width="stretch")
+                        if overlay is not None:
+                            col_a, col_b, col_c = st.columns(3)
+                            
+                            with col_a:
+                                st.markdown("**Original**")
+                                st.image(image_np, use_container_width=True)
+                            
+                            with col_b:
+                                st.markdown("**Your Mask**")
+                                user_viz = visualize_user_mask(image_np, result['matched_mask'])
+                                st.image(user_viz, use_container_width=True)
+                            
+                            with col_c:
+                                st.markdown("**Comparison**")
+                                st.image(overlay, use_container_width=True)
+                    except Exception as e:
+                        st.warning(f"Visualization error: {str(e)}")
+        
+        st.markdown("---")
+        st.subheader("📊 Summary")
+        
+        summary_data = []
+        for result in results:
+            summary_data.append({
+                "Question": result['question_id'],
+                "Category": result['question']['ground_truth']['category'],
+                "IoU": f"{result['iou']:.4f}" if result['iou'] > 0 else "N/A",
+                "Match": "✅" if result.get('class_match') else "❌",
+                "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
+            })
+        
+        st.dataframe(summary_data, use_container_width=True)
+        
+        # 실패시 재시작 버튼만
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.button("🔄 Restart", on_click=restart_seg_test, type="primary", use_container_width=True)

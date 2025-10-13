@@ -6,56 +6,46 @@ import cv2
 
 # Ground Truth Data - 정답 데이터 (여기에 실제 데이터를 넣으세요)
 SEGMENTATION_QUESTIONS = [
+    # {
+    #     "id": 2,
+    #     "image_path": "./assets/ILSVRC2012_val_00001953.JPEG",
+    #     "ground_truth": {
+    #         "type": "mask",  # "mask" or "json"
+    #         "mask_path": "./assets/ILSVRC2012_val_00001953_gt.png",
+    #         "category": "chair",
+    #         "image_shape": (480, 640)  # (height, width)
+    #     }
+    # },
     {
-    "id": 1,
-    "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
-    "ground_truth": {
-        "type": "mask",
-        "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
-        "category": "bottle",
-        "image_shape": (480, 640)
+        "id": 1,
+        "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
+        "ground_truth": {
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
+            "category": "dog",
+            "image_shape": (480, 640)
         }
     },
     {
         "id": 2,
-        "image_path": "./assets/ILSVRC2012_val_00001953.JPEG",
+        "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
         "ground_truth": {
-            "type": "mask",  # "mask" or "json"
-            "mask_path": "./assets/ILSVRC2012_val_00001953_gt.png",
-            "category": "chair",
-            "image_shape": (480, 640)  # (height, width)
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
+            "category": "car",
+            "image_shape": (480, 640)
         }
     },
-    # {
-    #     "id": 2,
-    #     "image_path": "./assets/ILSVRC2012_val_00007612.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00007612_gt.png",
-    #         "category": "dog",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
-    # {
-    #     "id": 3,
-    #     "image_path": "./assets/ILSVRC2012_val_00013722.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00013722_gt.png",
-    #         "category": "car",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
-    # {
-    #     "id": 4,
-    #     "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
-    #     "ground_truth": {
-    #         "type": "mask",
-    #         "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
-    #         "category": "cat",
-    #         "image_shape": (480, 640)
-    #     }
-    # },
+    {
+        "id": 3,
+        "image_path": "./assets/ILSVRC2012_val_00021098.JPEG",
+        "ground_truth": {
+            "type": "mask",
+            "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
+            "category": "cat",
+            "image_shape": (480, 640)
+        }
+    },
     # {
     #     "id": 5,
     #     "image_path": "./assets/ILSVRC2012_val_00030960.JPEG",
@@ -76,6 +66,16 @@ SEGMENTATION_QUESTIONS = [
     #         "image_shape": (480, 640)
     #     }
     # },
+    {
+    "id": 4,
+    "image_path": "./assets/ILSVRC2012_val_00045093.JPEG",
+    "ground_truth": {
+        "type": "mask",
+        "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
+        "category": "bottle",
+        "image_shape": (480, 640)
+        }
+    },
 ]
 
 # COCO Categories mapping

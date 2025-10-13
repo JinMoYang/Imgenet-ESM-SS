@@ -6,210 +6,210 @@ QUESTIONS = [
     {
         "id": 1,
         "definition": "A human being regarded as an individual.",
-        "options": ["person", "man", "woman", "child", "human"],
+        "options": ["child", "person", "woman", "human", "man"],
         "answer": "person",
         "category": "Person"
     },
     {
         "id": 2,
         "definition": "A domesticated carnivorous mammal that typically has a long snout, an acute sense of smell, non-retractable claws, and a barking, howling, or whining voice.",
-        "options": ["dog", "cat", "horse", "cow", "sheep"],
+        "options": ["cat", "sheep", "dog", "horse", "cow"],
         "answer": "dog",
         "category": "Animal"
     },
     {
         "id": 3,
         "definition": "A mechanical or electrical device for measuring time, indicating hours, minutes, and sometimes seconds by hands on a round dial or by displayed figures.",
-        "options": ["clock", "tv", "remote", "cell phone", "keyboard"],
+        "options": ["tv", "keyboard", "remote", "clock", "cell phone"],
         "answer": "clock",
         "category": "Indoor"
     },
     {
         "id": 4,
         "definition": "A dish of Italian origin consisting of a flat, round base of dough baked with a topping of tomato sauce and cheese, typically with added meat or vegetables.",
-        "options": ["pizza", "sandwich", "hot dog", "donut", "cake"],
+        "options": ["donut", "sandwich", "hot dog", "pizza", "cake"],
         "answer": "pizza",
         "category": "Kitchen"
     },
     {
         "id": 5,
         "definition": "A road vehicle, typically with four wheels, powered by an internal combustion engine or electric motor and able to carry a small number of people.",
-        "options": ["car", "bus", "truck", "motorcycle", "bicycle"],
+        "options": ["bicycle", "motorcycle", "car", "bus", "truck"],
         "answer": "car",
         "category": "Vehicle"
     },
     {
         "id": 6,
         "definition": "A piece of furniture for sleep or rest, typically a framework with a mattress and coverings.",
-        "options": ["bed", "couch", "chair", "bench", "dining table"],
+        "options": ["chair", "bench", "couch", "bed", "dining table"],
         "answer": "bed",
         "category": "Furniture"
     },
     {
         "id": 7,
         "definition": "The round fruit of a tree of the rose family, which typically has thin red or green skin and crisp flesh.",
-        "options": ["apple", "orange", "banana", "carrot", "broccoli"],
+        "options": ["carrot", "apple", "banana", "orange", "broccoli"],
         "answer": "apple",
         "category": "Kitchen"
     },
     {
         "id": 8,
         "definition": "A separate seat for one person, typically with a back and four legs.",
-        "options": ["chair", "couch", "bench", "bed", "dining table"],
+        "options": ["bed", "dining table", "chair", "couch", "bench"],
         "answer": "chair",
         "category": "Furniture"
     },
     {
         "id": 9,
         "definition": "A small domesticated carnivorous mammal with soft fur, a short snout, and retractable claws.",
-        "options": ["cat", "dog", "bear", "horse", "sheep"],
+        "options": ["bear", "dog", "sheep", "cat", "horse"],
         "answer": "cat",
         "category": "Animal"
     },
     {
         "id": 10,
         "definition": "A device with a screen for receiving television signals and displaying images and sound.",
-        "options": ["tv", "laptop", "cell phone", "clock", "microwave"],
+        "options": ["microwave", "clock", "cell phone", "laptop", "tv"],
         "answer": "tv",
         "category": "Electronic"
     },
     {
         "id": 11,
         "definition": "A round juicy citrus fruit with a tough bright reddish-yellow rind.",
-        "options": ["orange", "apple", "banana", "carrot", "broccoli"],
+        "options": ["broccoli", "banana", "orange", "apple", "carrot"],
         "answer": "orange",
         "category": "Kitchen"
     },
     {
         "id": 12,
         "definition": "A red octagonal road sign bearing the word \"STOP\" in white letters, indicating that vehicles must come to a complete halt.",
-        "options": ["stop sign", "traffic light", "fire hydrant", "parking meter", "bench"],
+        "options": ["parking meter", "bench", "fire hydrant", "stop sign", "traffic light"],
         "answer": "stop sign",
         "category": "Outdoor"
     },
     {
         "id": 13,
         "definition": "A vegetable with a green stem or stems and a compact head of small green or purplish flower buds, eaten as a vegetable.",
-        "options": ["broccoli", "carrot", "apple", "orange", "banana"],
+        "options": ["orange", "apple", "broccoli", "banana", "carrot"],
         "answer": "broccoli",
         "category": "Kitchen"
     },
     {
         "id": 14,
         "definition": "A bag with shoulder straps that allow it to be carried on one's back.",
-        "options": ["backpack", "handbag", "suitcase", "umbrella", "tie"],
+        "options": ["umbrella", "tie", "backpack", "suitcase", "handbag"],
         "answer": "backpack",
         "category": "Accessory"
     },
     {
         "id": 15,
         "definition": "An appliance or compartment that is artificially kept cool and used to store food and drink.",
-        "options": ["refrigerator", "microwave", "oven", "toaster", "sink"],
+        "options": ["toaster", "oven", "microwave", "refrigerator", "sink"],
         "answer": "refrigerator",
         "category": "Appliance"
     },
     {
         "id": 16,
         "definition": "A ball used in various athletic games and sports.",
-        "options": ["sports ball", "frisbee", "kite", "baseball bat", "tennis racket"],
+        "options": ["kite", "tennis racket", "frisbee", "sports ball", "baseball bat"],
         "answer": "sports ball",
         "category": "Sports"
     },
     {
         "id": 17,
         "definition": "A vehicle with two wheels held in a frame one behind the other, propelled by pedals and steered with handlebars attached to the front wheel.",
-        "options": ["bicycle", "motorcycle", "car", "bus", "skateboard"],
+        "options": ["bus", "skateboard", "motorcycle", "bicycle", "car"],
         "answer": "bicycle",
         "category": "Vehicle"
     },
     {
         "id": 18,
         "definition": "A set of automatically operated colored lights, typically red, amber, and green, for controlling traffic at road junctions and pedestrian crossings.",
-        "options": ["traffic light", "stop sign", "fire hydrant", "parking meter", "bench"],
+        "options": ["fire hydrant", "parking meter", "bench", "traffic light", "stop sign"],
         "answer": "traffic light",
         "category": "Outdoor"
     },
     {
         "id": 19,
         "definition": "A long seat for several people, typically made of wood or stone.",
-        "options": ["bench", "chair", "couch", "bed", "dining table"],
+        "options": ["couch", "dining table", "bench", "chair", "bed"],
         "answer": "bench",
         "category": "Outdoor"
     },
     {
         "id": 20,
         "definition": "A large bowl for urinating or defecating into, typically plumbed into a sewage system and with a flushing device.",
-        "options": ["toilet", "sink", "bed", "chair", "potted plant"],
+        "options": ["chair", "sink", "bed", "potted plant", "toilet"],
         "answer": "toilet",
         "category": "Furniture"
     },
     {
         "id": 21,
         "definition": "A small vessel propelled on water by oars, sails, or an engine.",
-        "options": ["boat", "car", "bus", "train", "airplane"],
+        "options": ["train", "airplane", "bus", "boat", "car"],
         "answer": "boat",
         "category": "Vehicle"
     },
     {
         "id": 22,
         "definition": "An African wild horse with black-and-white stripes and an erect mane.",
-        "options": ["zebra", "horse", "giraffe", "cow", "elephant"],
+        "options": ["giraffe", "cow", "zebra", "horse", "elephant"],
         "answer": "zebra",
         "category": "Animal"
     },
     {
         "id": 23,
         "definition": "A water outlet with a nozzle to which a fire hose can be attached, typically placed at regular intervals along streets.",
-        "options": ["fire hydrant", "stop sign", "traffic light", "parking meter", "bench"],
+        "options": ["stop sign", "parking meter", "fire hydrant", "traffic light", "bench"],
         "answer": "fire hydrant",
         "category": "Outdoor"
     },
     {
         "id": 24,
         "definition": "An instrument used for cutting cloth, paper, and other material, consisting of two blades laid one on top of the other and fastened in the middle so as to allow them to be opened and closed by a thumb and finger inserted through rings on the end of their handles.",
-        "options": ["scissors", "knife", "fork", "spoon", "toothbrush"],
+        "options": ["toothbrush", "scissors", "knife", "fork", "spoon"],
         "answer": "scissors",
         "category": "Indoor"
     },
     {
         "id": 25,
         "definition": "A toy consisting of a light frame with thin material stretched over it, flown in the wind at the end of a long string.",
-        "options": ["kite", "frisbee", "sports ball", "skateboard", "surfboard"],
+        "options": ["skateboard", "surfboard", "sports ball", "frisbee", "kite"],
         "answer": "kite",
         "category": "Sports"
     },
     {
         "id": 26,
         "definition": "A coin-operated device beside a parking space that registers the time purchased for parking and indicates when this has expired.",
-        "options": ["parking meter", "stop sign", "traffic light", "fire hydrant", "bench"],
+        "options": ["traffic light", "bench", "parking meter", "stop sign", "fire hydrant"],
         "answer": "parking meter",
         "category": "Outdoor"
     },
     {
         "id": 27,
         "definition": "Each of a pair of long, narrow pieces of hard flexible material, typically pointed and turned up at the front, fastened under the feet for gliding over snow.",
-        "options": ["skis", "snowboard", "surfboard", "skateboard", "frisbee"],
+        "options": ["surfboard", "frisbee", "snowboard", "skateboard", "skis"],
         "answer": "skis",
         "category": "Sports"
     },
     {
         "id": 28,
         "definition": "A racket with a round or oval frame strung with catgut, nylon, or similar material, used for playing tennis.",
-        "options": ["tennis racket", "baseball bat", "baseball glove", "frisbee", "sports ball"],
+        "options": ["baseball glove", "baseball bat", "frisbee", "sports ball", "tennis racket"],
         "answer": "tennis racket",
         "category": "Sports"
     },
     {
         "id": 29,
         "definition": "An electrical device for drying a person's hair by blowing warm air over it.",
-        "options": ["hair drier", "toothbrush", "remote", "mouse", "clock"],
+        "options": ["remote", "clock", "mouse", "toothbrush", "hair drier"],
         "answer": "hair drier",
         "category": "Indoor"
     },
     {
         "id": 30,
         "definition": "A decorative container, typically made of glass or china and used as an ornament or for displaying cut flowers.",
-        "options": ["vase", "bowl", "cup", "bottle", "potted plant"],
+        "options": ["bowl", "vase", "cup", "potted plant", "bottle"],
         "answer": "vase",
         "category": "Indoor"
     }

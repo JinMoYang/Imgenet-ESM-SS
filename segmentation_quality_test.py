@@ -98,6 +98,7 @@ COCO_CATEGORIES = {
     82: "refrigerator", 84: "book", 85: "clock", 86: "vase", 87: "scissors",
     88: "teddy bear", 89: "hair drier", 90: "toothbrush"
 }
+
 # Helper Functions
 def convert_labelme_to_coco(labelme_json):
     """Convert LabelMe format to COCO format - merge shapes with same group_id"""
@@ -322,11 +323,14 @@ def visualize_comparison(image, pred_mask, gt_mask):
     
     return overlay.astype(np.uint8)
 
-# Initialize session state
+# Main App
+st.set_page_config(page_title="Segmentation Annotation Test", page_icon="🎯", layout="wide")
+
+# Initialize session state - MUST be before any usage
 if 'seg_current_question' not in st.session_state:
     st.session_state.seg_current_question = 0
 if 'seg_uploaded_jsons' not in st.session_state:
-    st.session_state.seg_uploaded_jsons = {}  # {question_id: json_data}
+    st.session_state.seg_uploaded_jsons = {}
 if 'seg_test_started' not in st.session_state:
     st.session_state.seg_test_started = False
 if 'seg_test_completed' not in st.session_state:

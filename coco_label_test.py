@@ -368,12 +368,15 @@ elif st.session_state.test_started and not st.session_state.test_completed:
     """, unsafe_allow_html=True)
     
     # Options
-    st.session_state.selected_answer = st.radio(
+    selected = st.radio(
         "Select your answer:",
         q['options'],
         key=f"q_{st.session_state.current_question}",
-        index=None if st.session_state.selected_answer is None else q['options'].index(st.session_state.selected_answer) if st.session_state.selected_answer in q['options'] else None
+        index=None
     )
+    
+    if selected:
+        st.session_state.selected_answer = selected
     
     # Feedback
     if st.session_state.show_feedback:

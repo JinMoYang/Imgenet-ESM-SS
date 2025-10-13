@@ -483,7 +483,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             button_type = "primary" if is_current else "secondary"
             
             if st.button(
-                f"{status} Question {q['id']}: {q['ground_truth']['category']}", 
+                f"{status} Question {q['id']}", 
                 key=f"nav_{idx}",
                 type=button_type,
                 disabled=is_current,
@@ -509,7 +509,6 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
     st.markdown(f"""
     <div class="question-box">
         <h2>Question {q['id']} of {len(SEGMENTATION_QUESTIONS)}</h2>
-        <p style="font-size: 16px;">Expected Category: <strong>{q['ground_truth']['category']}</strong></p>
         <p style="font-size: 14px; opacity: 0.9;">Upload your annotation JSON to see instant visualization</p>
     </div>
     """, unsafe_allow_html=True)
@@ -688,7 +687,7 @@ elif st.session_state.seg_test_completed:
     for result in results:
         q = result['question']
         
-        with st.expander(f"Question {result['question_id']}: {q['ground_truth']['category']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
+        with st.expander(f"Question {result['question_id']} - {'✅ PASS' if result['passed'] else '❌ FAIL'}"):
             
             col1, col2, col3 = st.columns(3)
             

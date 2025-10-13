@@ -445,7 +445,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
     st.markdown(f"""
     <div class="question-box">
         <h2>Question {q['id']} of {len(SEGMENTATION_QUESTIONS)}</h2>
-        <p style="font-size: 16px;">Try to annotate <strong>{q['ground_truth']['category']}</strong> in the image</p>
+        <h2 style="font-size: 16px;">Try to annotate <strong>{q['ground_truth']['category']}</strong> in the image</h2>
     </div>
     """, unsafe_allow_html=True)
     

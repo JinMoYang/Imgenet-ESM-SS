@@ -483,6 +483,33 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 mime="image/png",
                 width="stretch"
             )
+            
+            # Ground Truth Visualization
+            with st.expander("🔍 View Ground Truth Mask (Debug)"):
+                try:
+                    gt_mask = load_ground_truth(q['ground_truth'])
+                    if gt_mask is not None:
+                        st.success(f"✅ GT Mask loaded: shape={gt_mask.shape}, unique values={np.unique(gt_mask)}")
+                        st.text(f"GT pixels (1s): {gt_mask.sum()}, Total: {gt_mask.size}")
+                        
+                        # Show GT mask overlay
+                        gt_overlay = visualize_user_mask(image_np, gt_mask)
+                        if gt_overlay is not None:
+                            st.image(gt_overlay, caption="Ground Truth Mask Overlay", width="stretch")
+                        
+                        # Show raw mask
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.image(gt_mask * 255, caption="Raw GT Mask", width="stretch")
+                        with col_b:
+                            st.image(image_np, caption="Original Image", width="stretch")
+                    else:
+                        st.error("❌ Failed to load GT mask")
+                except Exception as e:
+                    st.error(f"GT Debug Error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+            
         except Exception as e:
             st.error(f"Error loading image: {str(e)}")
     

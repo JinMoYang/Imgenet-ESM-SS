@@ -498,6 +498,11 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             st.success(f"✅ All {len(SEGMENTATION_QUESTIONS)} questions completed!")
             if st.button("📤 Submit All Answers", type="primary", width="stretch"):
                 submit_all_answers()
+        elif st.session_state.seg_test_started and not st.session_state.seg_test_completed:
+            # Safety check
+            if st.session_state.seg_current_question >= len(SEGMENTATION_QUESTIONS):
+                st.session_state.seg_current_question = 0
+                st.rerun()
         else:
             st.warning(f"⚠️ {len(SEGMENTATION_QUESTIONS) - completed_count} questions remaining")
     
@@ -749,7 +754,7 @@ elif st.session_state.seg_test_completed:
             "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
         })
     
-    st.dataframe(summary_data, use_container_width=True)
+    st.dataframe(summary_data, width='stretch')
     
     # Restart button
     col1, col2, col3 = st.columns([1, 1, 1])

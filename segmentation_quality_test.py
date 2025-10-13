@@ -98,6 +98,63 @@ COCO_CATEGORIES = {
     82: "refrigerator", 84: "book", 85: "clock", 86: "vase", 87: "scissors",
     88: "teddy bear", 89: "hair drier", 90: "toothbrush"
 }
+def convert_labelme_to_coco(labelme_json):
+    """Convert LabelMe format to COCO format"""
+    if 'shapes' in labelme_json:
+        # This is LabelMe format, convert to COCO
+        coco_json = {
+            'annotations': [],
+            'categories': []
+        }
+        
+        category_map = {}
+        category_id = 1
+        
+        for idx, shape in enumerate(labelme_json['shapes']):
+            label = shape.get('label', 'unknown')
+            
+            # Add category if not exists
+            if label not in category_map:
+                category_map[label] = category_id
+                coco_json['categories'].append({
+                    'id': category_id,
+                    'name': label,
+                    'supercategory': label
+                })
+                category_id += 1
+            
+            # Convert points to COCO segmentation format
+            points = shape.get('points', [])
+            if len(points) >= 3:  # Need at least 3 points for polygon
+                # Flatten points: [[x1,y1], [x2,y2]] -> [x1,y1,x2,y2]
+                flat_points = []
+                for point in points:
+                    flat_points.extend([float(point[0]), float(point[1])])
+                
+                # Calculate bbox
+                xs = [point[0] for point in points]
+                ys = [point[1] for point in points]
+                x_min, x_max = min(xs), max(xs)
+                y_min, y_max = min(ys), max(ys)
+                bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
+                
+                # Calculate area (approximate)
+                area = (x_max - x_min) * (y_max - y_min)
+                
+                coco_json['annotations'].append({
+                    'id': idx + 1,
+                    'image_id': 1,
+                    'category_id': category_map[label],
+                    'segmentation': [flat_points],
+                    'area': area,
+                    'bbox': bbox,
+                    'iscrowd': 0
+                })
+        
+        return coco_json
+    else:
+        # Already COCO format
+        return labelme_json
 
 # Helper Functions
 def polygon_to_mask(segmentation, image_shape):
@@ -467,10 +524,17 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 # Parse JSON
                 user_json = json.load(uploaded_file)
                 
+                # Convert LabelMe to COCO format if needed
+                user_json = convert_labelme_to_coco(user_json)
+                
                 # Save to session state
                 st.session_state.seg_uploaded_jsons[q_id] = user_json
                 
                 st.success("✅ File uploaded successfully!")
+                
+                # Show format detection
+                if 'shapes' in json.loads(uploaded_file.getvalue().decode()):
+                    st.info("📝 Detected LabelMe format - automatically converted to COCO format")
                 
                 with st.expander("📄 View uploaded JSON"):
                     st.json(user_json)
@@ -482,13 +546,13 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 st.error("❌ Invalid JSON file. Please upload a valid JSON.")
             except Exception as e:
                 st.error(f"❌ Error reading file: {str(e)}")
-        
+            
         elif q_id in st.session_state.seg_uploaded_jsons:
             st.success("✅ JSON already uploaded for this question")
             
             with st.expander("📄 View uploaded JSON"):
                 st.json(st.session_state.seg_uploaded_jsons[q_id])
-    
+        
     # Instant Visualization Section
     if q_id in st.session_state.seg_uploaded_jsons:
         st.markdown("---")

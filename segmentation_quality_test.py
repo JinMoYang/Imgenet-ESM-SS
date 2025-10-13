@@ -42,7 +42,7 @@ SEGMENTATION_QUESTIONS = [
         "ground_truth": {
             "type": "mask",
             "mask_path": "./assets/ILSVRC2012_val_00021098_gt.png",
-            "category": "cat",
+            "category": "orange/banana",
             "image_shape": (480, 640)
         }
     },
@@ -72,7 +72,7 @@ SEGMENTATION_QUESTIONS = [
     "ground_truth": {
         "type": "mask",
         "mask_path": "./assets/ILSVRC2012_val_00045093_gt.png",
-        "category": "bottle",
+        "category": "orange",
         "image_shape": (480, 640)
         }
     },

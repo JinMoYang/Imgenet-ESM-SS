@@ -183,10 +183,18 @@ def polygon_to_mask(segmentation, image_shape):
 def load_png_mask(file_path):
     """Load PNG mask file and convert to binary mask"""
     try:
-        mask = Image.open(file_path).convert('L')
-        mask = np.array(mask)
-        st.write(mask)
-        return (mask > 127).astype(np.uint8)
+        mask = Image.open(file_path)
+        mask_array = np.array(mask)
+        
+        # Handle RGB/RGBA masks (like red object on black background)
+        if len(mask_array.shape) == 3:  # RGB or RGBA
+            # Sum across color channels - any non-zero pixel is part of the mask
+            binary_mask = (mask_array.sum(axis=2) > 0).astype(np.uint8)
+        else:  # Grayscale
+            binary_mask = (mask_array > 127).astype(np.uint8)
+        
+        return binary_mask
+        
     except Exception as e:
         st.error(f"Error loading mask: {str(e)}")
         return None
@@ -513,7 +521,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
             
         except Exception as e:
             st.error(f"Error loading image: {str(e)}")
-    
+
     with col2:
         st.subheader("📤 Upload Annotation")
         

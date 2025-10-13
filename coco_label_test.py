@@ -412,7 +412,8 @@ elif st.session_state.test_completed:
             <h2>Your Score: {st.session_state.score}/{len(QUESTIONS)}</h2>
             <p style="font-size: 24px;">Percentage: {percentage:.1f}%</p>
             <p style="margin-top: 20px; font-size: 16px; opacity: 0.9;">
-                Congratulations! You may proceed to Part 2.
+                Congratulations! You may proceed to objectness test.
+            <a href="https://imgenet-esm-ss-h52gbsgcpnzn7jxsnqi3x9.streamlit.app/" target="_blank" style="color: #155724; text-decoration: underline;">Click here to proceed to objectness test</a>
             </p>
         </div>
         """, unsafe_allow_html=True)

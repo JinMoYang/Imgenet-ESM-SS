@@ -76,8 +76,6 @@ SEGMENTATION_QUESTIONS = [
     #         "image_shape": (480, 640)
     #     }
     # },
-
-    # }
 ]
 
 # COCO Categories mapping

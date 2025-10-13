@@ -355,6 +355,8 @@ def restart_seg_test():
     st.session_state.seg_test_started = False
     st.session_state.seg_test_completed = False
 
+# Main App
+st.set_page_config(page_title="Segmentation Annotation Test", page_icon="🎯", layout="wide")
 
 # Custom CSS
 st.markdown("""
@@ -596,6 +598,8 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 
                 num_annotations = len(user_json.get('annotations', []))
                 st.info(f"📊 Found {num_annotations} annotation(s) in your file")
+                
+                st.rerun()
                 
             except json.JSONDecodeError:
                 st.error("❌ Invalid JSON file. Please upload a valid JSON.")

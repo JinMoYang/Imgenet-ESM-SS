@@ -3,6 +3,7 @@ import json
 import numpy as np
 from PIL import Image, ImageDraw
 import cv2
+import io
 
 # Ground Truth Data - 정답 데이터 (여기에 실제 데이터를 넣으세요)
 SEGMENTATION_QUESTIONS = [

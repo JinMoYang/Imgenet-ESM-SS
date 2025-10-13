@@ -355,8 +355,6 @@ def restart_seg_test():
     st.session_state.seg_test_started = False
     st.session_state.seg_test_completed = False
 
-# Main App
-st.set_page_config(page_title="Segmentation Annotation Test", page_icon="🎯", layout="wide")
 
 # Custom CSS
 st.markdown("""

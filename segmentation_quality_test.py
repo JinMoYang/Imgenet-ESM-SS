@@ -229,52 +229,55 @@ def load_ground_truth(gt_data):
     return None
 
 def evaluate_submission(user_json, ground_truth_mask, gt_category, image_shape):
-    """Evaluate user submission"""
+    """Evaluate user submission - combine all annotations into one mask"""
     if 'annotations' not in user_json or len(user_json['annotations']) == 0:
         return {
             'passed': False,
             'iou': 0.0,
             'matched_annotation': None,
+            'matched_mask': None,
             'error': 'No annotations found in JSON'
         }
     
-    best_iou = 0.0
-    best_annotation = None
-    best_mask = None
-    
     actual_gt_shape = ground_truth_mask.shape
+    
+    # Combine all annotations into one mask
+    combined_mask = np.zeros(actual_gt_shape, dtype=np.uint8)
     
     for ann in user_json['annotations']:
         try:
             user_mask = polygon_to_mask(ann['segmentation'], actual_gt_shape)
-            iou = calculate_iou(user_mask, ground_truth_mask)
-            
-            if iou > best_iou:
-                best_iou = iou
-                best_annotation = ann
-                best_mask = user_mask
+            # Union (OR) operation to combine all masks
+            combined_mask = np.logical_or(combined_mask, user_mask).astype(np.uint8)
         except Exception as e:
-            st.warning(f"Error processing annotation: {str(e)}")
+            st.warning(f"Error processing annotation {ann.get('id', 'unknown')}: {str(e)}")
             continue
     
-    if best_annotation is None:
+    # Check if combined mask is empty
+    if combined_mask.sum() == 0:
         return {
             'passed': False,
             'iou': 0.0,
             'matched_annotation': None,
             'matched_mask': None,
-            'error': 'Failed to process annotations'
+            'error': 'All annotations failed to process or resulted in empty mask'
         }
     
-    user_category = get_category_name(best_annotation['category_id'], user_json)
-    passed = (best_iou >= 0.9)  # IoU만으로 평가
+    # Calculate IoU with combined mask
+    iou = calculate_iou(combined_mask, ground_truth_mask)
+    
+    # Get category from first annotation (for reference)
+    user_category = get_category_name(user_json['annotations'][0]['category_id'], user_json)
+    
+    passed = (iou >= 0.9)
     
     return {
         'passed': passed,
-        'iou': best_iou,
-        'matched_annotation': best_annotation,
-        'matched_mask': best_mask,
+        'iou': iou,
+        'matched_annotation': user_json['annotations'][0],  # First annotation for reference
+        'matched_mask': combined_mask,
         'user_category': user_category,
+        'num_annotations': len(user_json['annotations']),
         'error': None
     }
 

@@ -279,13 +279,19 @@ elif st.session_state.test_started and not st.session_state.test_completed:
                 st.session_state.current_answers[q_key] = answer
                 
             elif question['type'] == "radio":
+                # 기본값을 None으로 설정 (아무것도 선택 안 됨)
+                default_index = None
+                if q_key in st.session_state.current_answers:
+                    default_index = question['options'].index(st.session_state.current_answers[q_key])
+                
                 answer = st.radio(
                     "Your answer:",
                     question['options'],
-                    index=question['options'].index(st.session_state.current_answers.get(q_key, question['options'][0])) if q_key in st.session_state.current_answers else 0,
+                    index=default_index,
                     key=f"input_{q_key}"
                 )
-                st.session_state.current_answers[q_key] = answer
+                if answer is not None:
+                    st.session_state.current_answers[q_key] = answer
             
             st.markdown('</div>', unsafe_allow_html=True)
     

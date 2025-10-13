@@ -372,7 +372,7 @@ if not st.session_state.seg_test_started:
     
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.button("Start Test", on_click=start_seg_test, type="primary", use_container_width=True)
+        st.button("Start Test", on_click=start_seg_test, type="primary", width = 'stretch')
 
 # Test in Progress
 elif st.session_state.seg_test_started and not st.session_state.seg_test_completed:
@@ -399,7 +399,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
         st.subheader("Test Image")
         try:
             image = Image.open(q['image_path'])
-            st.image(image, use_container_width=True)
+            st.image(image, width = 'stretch')
             
             # Download button for the image
             import io
@@ -412,7 +412,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                 data=buf,
                 file_name=f"question_{q['id']}_image.png",
                 mime="image/png",
-                use_container_width=True
+                width = 'stretch'
             )
         except Exception as e:
             st.error(f"Error loading image: {str(e)}")
@@ -521,7 +521,7 @@ elif st.session_state.seg_test_started and not st.session_state.seg_test_complet
                         image_np = np.array(Image.open(q['image_path']))
                         overlay = visualize_comparison(image_np, result['matched_mask'], gt_mask)
                         if overlay is not None:
-                            st.image(overlay, use_container_width=True)
+                            st.image(overlay, width = 'stretch')
                     except Exception as e:
                         st.warning(f"Could not generate visualization: {str(e)}")
                 
@@ -580,9 +580,9 @@ elif st.session_state.seg_test_completed:
             "Result": "✅ PASS" if result['passed'] else "❌ FAIL"
         })
     
-    st.dataframe(results_data, use_container_width=True)
+    st.dataframe(results_data, width = 'stretch')
     
     # Restart button
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.button("Restart Test", on_click=restart_seg_test, type="primary", use_container_width=True)
+        st.button("Restart Test", on_click=restart_seg_test, type="primary", width = 'stretch')

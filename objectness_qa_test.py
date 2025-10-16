@@ -7,7 +7,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # Configuration
-IMAGE_DIR = "./assets/objectness_qa_test"
+IMAGE_DIR = "./assets/objectness_original"
+IMAGE_DIR_2 = "./assets/objectness_checked"  # Second version directory
 
 @st.cache_resource
 def get_gsheet_connection():
@@ -439,11 +440,13 @@ with col5:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Image and Questions
-col_img, col_qa = st.columns([1, 1])
+# Display two versions of images side by side
+st.subheader("📸 Image Comparison")
+col_img1, col_img2 = st.columns([1, 1])
 
-with col_img:
+with col_img1:
     st.markdown('<div class="image-container">', unsafe_allow_html=True)
+    st.markdown("**Original**")
     image_path = os.path.join(IMAGE_DIR, current_image)
 
     if os.path.exists(image_path):
@@ -454,9 +457,26 @@ with col_img:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-with col_qa:
-    st.subheader("Review Questions")
+with col_img2:
+    st.markdown('<div class="image-container">', unsafe_allow_html=True)
+    st.markdown("**Checked**")
+    image_path_2 = os.path.join(IMAGE_DIR_2, current_image)
 
+    if os.path.exists(image_path_2):
+        image_2 = Image.open(image_path_2)
+        st.image(image_2, caption=current_image, use_container_width=True)
+    else:
+        st.warning(f"⚠️ Version 2 not found: {image_path_2}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Questions section below images
+st.markdown("---")
+st.subheader("Review Questions")
+
+col_qa = st.container()
+
+with col_qa:
     # Load saved response if exists
     if current_image in st.session_state.responses:
         saved = st.session_state.responses[current_image]

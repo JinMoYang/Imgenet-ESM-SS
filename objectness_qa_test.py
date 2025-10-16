@@ -7,7 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # Configuration
-IMAGE_DIR = "./assets"
+IMAGE_DIR = "./assets/objectness_qa_test"
 
 @st.cache_resource
 def get_gsheet_connection():
@@ -64,7 +64,7 @@ def get_reviewer_worksheet(spreadsheet, reviewer_name):
             ]
             worksheet.append_row(headers)
 
-            # Format the header row (bold, background color, centered)
+            # Format the header row
             worksheet.format('A1:G1', {
                 'textFormat': {'bold': True, 'fontSize': 11},
                 'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
@@ -72,27 +72,14 @@ def get_reviewer_worksheet(spreadsheet, reviewer_name):
                 'wrapStrategy': 'WRAP'
             })
 
-            # Set column widths using batch update
-            requests = []
-            column_widths = [180, 150, 200, 280, 320, 320, 350]  # A through G
-            for i, width in enumerate(column_widths):
-                requests.append({
-                    'updateDimensionProperties': {
-                        'range': {
-                            'sheetId': worksheet.id,
-                            'dimension': 'COLUMNS',
-                            'startIndex': i,
-                            'endIndex': i + 1
-                        },
-                        'properties': {
-                            'pixelSize': width
-                        },
-                        'fields': 'pixelSize'
-                    }
-                })
-
-            # Apply batch update for column widths
-            spreadsheet.batch_update({'requests': requests})
+            # Set column widths for better readability
+            worksheet.set_column_width('A', 180)  # Timestamp
+            worksheet.set_column_width('B', 150)  # Reviewer
+            worksheet.set_column_width('C', 200)  # Image name
+            worksheet.set_column_width('D', 280)  # Q1
+            worksheet.set_column_width('E', 320)  # Q2 - Objects to add
+            worksheet.set_column_width('F', 320)  # Q3 - Objects to subtract
+            worksheet.set_column_width('G', 350)  # Q4 - Comments
 
             # Freeze header row
             worksheet.freeze(rows=1)

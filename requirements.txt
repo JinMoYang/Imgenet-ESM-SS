@@ -1,8 +1,12 @@
 jupyter
 ipywidgets
-streamlit
+streamlit>=1.28.0
 pandas
 matplotlib
 numpy
-pillow
+Pillow>=10.0.0
 opencv-python-headless
+gspread>=5.11.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1

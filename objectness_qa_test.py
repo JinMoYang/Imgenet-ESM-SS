@@ -27,7 +27,8 @@ def get_gsheet_connection():
         client = gspread.authorize(credentials)
         
         # Open spreadsheet by URL
-        spreadsheet = client.open_by_url(st.secrets["spreadsheet_url"])
+        # spreadsheet = client.open_by_url(st.secrets["spreadsheet_url"])
+        spreadsheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1sPD3BKub_lITqwvo51SQ7C35AMMJGeD8T2FshSzaUT4/edit")
         
         # Get or create worksheet
         try:

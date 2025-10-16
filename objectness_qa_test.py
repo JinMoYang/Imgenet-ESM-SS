@@ -3,8 +3,9 @@ from PIL import Image
 import os
 import glob
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 
 # Configuration
 IMAGE_DIR = "./assets"
@@ -12,13 +13,39 @@ WORKSHEET_NAME = "Reviews"
 
 @st.cache_resource
 def get_gsheet_connection():
-    """Initialize Google Sheets connection"""
+    """Initialize Google Sheets connection with Service Account"""
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        return conn
+        # Get credentials from Streamlit secrets
+        credentials = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=[
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+        )
+        
+        client = gspread.authorize(credentials)
+        
+        # Open spreadsheet by URL
+        spreadsheet = client.open_by_url(st.secrets["spreadsheet_url"])
+        
+        # Get or create worksheet
+        try:
+            worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title=WORKSHEET_NAME, rows=100, cols=10)
+            # Add headers
+            worksheet.append_row([
+                'Timestamp', 'Reviewer', 'Image Name',
+                'Objectness Appropriate', 'Objects to Add',
+                'Objects to Subtract', 'Other Comments'
+            ])
+        
+        return worksheet
+        
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {str(e)}")
-        st.info("Make sure you've added the spreadsheet URL to secrets.toml")
+        st.info("Make sure you've set up Service Account credentials in secrets")
         return None
 
 def save_to_google_sheets(reviewer_name, responses):
@@ -31,57 +58,54 @@ def save_to_google_sheets(reviewer_name, responses):
         st.warning("No reviews to submit yet!")
         return False, 0
     
-    conn = get_gsheet_connection()
-    if conn is None:
+    worksheet = get_gsheet_connection()
+    if worksheet is None:
         return False, 0
     
     try:
-        # Try to read existing data
-        try:
-            existing_df = conn.read(worksheet=WORKSHEET_NAME, ttl=0)
-            # Ensure columns exist
-            required_columns = [
-                'Timestamp', 'Reviewer', 'Image Name',
-                'Objectness Appropriate', 'Objects to Add',
-                'Objects to Subtract', 'Other Comments'
-            ]
-            for col in required_columns:
-                if col not in existing_df.columns:
-                    existing_df[col] = ''
-        except:
-            # Create new dataframe if sheet is empty
-            existing_df = pd.DataFrame(columns=[
-                'Timestamp', 'Reviewer', 'Image Name',
-                'Objectness Appropriate', 'Objects to Add',
-                'Objects to Subtract', 'Other Comments'
-            ])
-        
-        # Prepare new rows
-        new_rows = []
+        # Prepare rows to append
+        rows_to_add = []
         for image_name, response in responses.items():
-            new_rows.append({
-                'Timestamp': response['timestamp'],
-                'Reviewer': reviewer_name,
-                'Image Name': image_name,
-                'Objectness Appropriate': response['objectness_appropriate'],
-                'Objects to Add': response['objects_to_add'],
-                'Objects to Subtract': response['objects_to_subtract'],
-                'Other Comments': response['other_comments']
-            })
+            row = [
+                response['timestamp'],
+                reviewer_name,
+                image_name,
+                response['objectness_appropriate'],
+                response['objects_to_add'],
+                response['objects_to_subtract'],
+                response['other_comments']
+            ]
+            rows_to_add.append(row)
         
-        new_df = pd.DataFrame(new_rows)
+        # Append all rows at once
+        if rows_to_add:
+            worksheet.append_rows(rows_to_add)
         
-        # Combine and update
-        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-        
-        # Write to sheet
-        conn.update(worksheet=WORKSHEET_NAME, data=updated_df)
-        
-        return True, len(new_rows)
+        return True, len(rows_to_add)
         
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
         return False, 0
+
+def export_to_csv(reviewer_name, responses):
+    """Export responses to downloadable CSV (backup option)"""
+    if not responses:
+        return None
+    
+    rows = []
+    for image_name, response in responses.items():
+        rows.append({
+            'Timestamp': response['timestamp'],
+            'Reviewer': reviewer_name,
+            'Image Name': image_name,
+            'Objectness Appropriate': response['objectness_appropriate'],
+            'Objects to Add': response['objects_to_add'],
+            'Objects to Subtract': response['objects_to_subtract'],
+            'Other Comments': response['other_comments']
+        })
+    
+    df = pd.DataFrame(rows)
+    return df.to_csv(index=False).encode('utf-8')
 
 def get_image_list():
     """Get list of all JPEG images in the assets directory"""
@@ -201,68 +225,91 @@ if not st.session_state.app_started:
     st.markdown("## 📋 Setup Instructions")
 
     st.markdown("""
-    ### 1. Google Sheets Setup (Simple Method)
-
-    **No Google Cloud Account Required!**
-
-    **Steps:**
-
-    1. **Create a Google Spreadsheet**
-       - Go to [Google Sheets](https://sheets.google.com)
-       - Create a new spreadsheet
-       - Name it anything you want (e.g., "Objectness QA Reviews")
-       - Create a worksheet tab named: **"Reviews"**
-
-    2. **Share the Spreadsheet**
-       - Click the "Share" button (top right)
-       - Change to: **"Anyone with the link"**
-       - Set permission to: **"Editor"**
-       - Copy the spreadsheet URL
-
-    3. **Add to Streamlit Secrets**
-       - Create `.streamlit/secrets.toml` file in your project directory
-       - Add the following:
-       ```toml
-       [connections.gsheets]
-       spreadsheet = "YOUR_GOOGLE_SHEET_URL_HERE"
-       ```
-       
-    4. **For Streamlit Cloud**
-       - Go to App Settings → Secrets
-       - Paste the same content:
-       ```
-       [connections.gsheets]
-       spreadsheet = "YOUR_GOOGLE_SHEET_URL_HERE"
-       ```
-
-    **That's it!** Much simpler than Service Account setup.
+    ### 1. Google Sheets Setup with Service Account
+    
+    **One-time setup required for automatic Google Sheets integration:**
+    
+    #### A. Create Service Account (5 minutes)
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new project (or select existing)
+    3. Enable APIs:
+       - **Google Sheets API**
+       - **Google Drive API**
+    4. Create Service Account:
+       - Go to **APIs & Services → Credentials**
+       - Click **Create Credentials → Service Account**
+       - Name it (e.g., "streamlit-app")
+       - Click **Done**
+    5. Generate Key:
+       - Click on the created service account
+       - Go to **Keys** tab
+       - Click **Add Key → Create New Key → JSON**
+       - Download the JSON file
+    
+    #### B. Share Your Google Sheet
+    1. Open your Google Sheet
+    2. Click **Share** button
+    3. Copy the `client_email` from the JSON file (looks like: `something@project.iam.gserviceaccount.com`)
+    4. Add this email as **Editor**
+    
+    #### C. Add to Streamlit Secrets
+    
+    **For Local Development:**
+    
+    Create `.streamlit/secrets.toml`:
+    ```toml
+    [gcp_service_account]
+    type = "service_account"
+    project_id = "your-project-id"
+    private_key_id = "key-id"
+    private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
+    client_email = "your-service-account@project.iam.gserviceaccount.com"
+    client_id = "123456789"
+    auth_uri = "https://accounts.google.com/o/oauth2/auth"
+    token_uri = "https://oauth2.googleapis.com/token"
+    auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+    client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-email"
+    
+    spreadsheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+    ```
+    
+    **For Streamlit Cloud:**
+    - Go to App Settings → Secrets
+    - Paste the same content
+    
+    #### D. Requirements
+    Make sure `requirements.txt` includes:
+    ```
+    gspread>=6.0.0
+    google-auth>=2.0.0
+    ```
     """)
 
     st.markdown("---")
 
     st.markdown("""
     ### 2. How to Use This App
-
+    
     **Navigation:**
     - Use **Previous/Next** buttons to move between images
     - **Jump to Image** - Enter any image number to jump directly
     - Progress is tracked in the sidebar
-
+    
     **Questions for Each Image:**
     1. **Is the objectness appropriate?** - Select Yes/No
     2. **Objects to add** - List any objects that should be annotated but aren't
     3. **Objects to subtract** - List any objects that shouldn't be annotated
     4. **Other comments** - Additional feedback or observations
-
+    
     **Saving Your Work:**
     - Responses auto-save when you navigate to another image
     - Click "Save Response" button to manually save
     - Your progress persists during the session
-
+    
     **Submitting:**
     - Click "Submit All to Google Sheets" when done
-    - All your reviews will be saved to the spreadsheet
-    - Each row includes: timestamp, your name, image name, and all responses
+    - All reviews automatically saved to your Google Sheet
+    - CSV download available as backup
     """)
 
     st.markdown("---")
@@ -330,17 +377,36 @@ with st.sidebar:
 
     st.divider()
 
-    # Submit all button
+    # Submit options
     st.header("Submit Reviews")
+    
+    # Google Sheets submit
     if st.button("📤 Submit All to Google Sheets", type="primary", use_container_width=True):
-        with st.spinner("Submitting to Google Sheets..."):
-            success, count = save_to_google_sheets(
-                st.session_state.reviewer_name,
-                st.session_state.responses
+        if reviewed_count == 0:
+            st.warning("No reviews to submit yet!")
+        else:
+            with st.spinner("Submitting to Google Sheets..."):
+                success, count = save_to_google_sheets(
+                    st.session_state.reviewer_name,
+                    st.session_state.responses
+                )
+                if success:
+                    st.success(f"✅ Successfully submitted {count} reviews!")
+                    st.balloons()
+    
+    # CSV backup download
+    if reviewed_count > 0:
+        st.divider()
+        st.subheader("Backup Option")
+        csv_data = export_to_csv(st.session_state.reviewer_name, st.session_state.responses)
+        if csv_data:
+            st.download_button(
+                label="📥 Download CSV Backup",
+                data=csv_data,
+                file_name=f"review_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
             )
-            if success:
-                st.success(f"✅ Successfully submitted {count} reviews!")
-                st.balloons()
 
     st.divider()
 
@@ -349,15 +415,16 @@ with st.sidebar:
         st.markdown("""
         1. **Enter your name** in the sidebar
         2. **Review each image** and answer the questions
-        3. **Navigate** using Prev/Next buttons or jump to a specific image
-        4. Your responses are **automatically saved** as you type
-        5. Click **Submit All** when you've reviewed all images
+        3. **Navigate** using Prev/Next buttons
+        4. Responses are **auto-saved** as you type
+        5. Click **Submit All to Google Sheets** when done
+        6. Optionally download CSV backup
 
         **Questions:**
-        - **Objectness Appropriate?** - Does the annotation correctly identify all objects?
-        - **Objects to Add** - List any objects that should be annotated but aren't
-        - **Objects to Subtract** - List any objects that shouldn't be annotated
-        - **Other Comments** - Any additional feedback
+        - **Objectness Appropriate?** - Does annotation identify all objects correctly?
+        - **Objects to Add** - Missing objects
+        - **Objects to Subtract** - Incorrectly annotated objects
+        - **Other Comments** - Additional feedback
         """)
 
 # Check if images exist

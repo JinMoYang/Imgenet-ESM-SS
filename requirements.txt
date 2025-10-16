@@ -6,4 +6,5 @@ numpy
 Pillow
 opencv-python-headless
 streamlit>=1.28.0
-git+https://github.com/streamlit/gsheets-connection.git
+gspread>=6.0.0
+google-auth>=2.0.0

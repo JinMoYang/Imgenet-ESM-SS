@@ -8,11 +8,10 @@ from google.oauth2.service_account import Credentials
 
 # Configuration
 IMAGE_DIR = "./assets"
-WORKSHEET_NAME = "Reviews"
 
 @st.cache_resource
 def get_gsheet_connection():
-    """Initialize Google Sheets connection with Service Account"""
+    """Initialize Google Sheets connection and return spreadsheet"""
     try:
         # Get credentials from Streamlit secrets
         credentials = Credentials.from_service_account_info(
@@ -22,46 +21,95 @@ def get_gsheet_connection():
                 "https://www.googleapis.com/auth/drive"
             ]
         )
-        
+
         client = gspread.authorize(credentials)
-        
+
         # Open spreadsheet by URL
         # spreadsheet = client.open_by_url(st.secrets["spreadsheet_url"])
         spreadsheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1sPD3BKub_lITqwvo51SQ7C35AMMJGeD8T2FshSzaUT4/edit")
-        
-        # Get or create worksheet
-        try:
-            worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = spreadsheet.add_worksheet(title=WORKSHEET_NAME, rows=100, cols=10)
-            # Add headers
-            worksheet.append_row([
-                'Timestamp', 'Reviewer', 'Image Name',
-                'Objectness Appropriate', 'Objects to Add',
-                'Objects to Subtract', 'Other Comments'
-            ])
-        
-        return worksheet
-        
+
+        return spreadsheet
+
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {str(e)}")
         st.info("Make sure you've set up Service Account credentials in secrets")
         return None
 
+def get_reviewer_worksheet(spreadsheet, reviewer_name):
+    """Get or create a worksheet for specific reviewer with formatted headers"""
+    if not spreadsheet or not reviewer_name:
+        return None
+
+    try:
+        # Sanitize reviewer name for worksheet title (max 100 chars)
+        worksheet_name = reviewer_name.strip()[:100]
+
+        # Try to get existing worksheet
+        try:
+            worksheet = spreadsheet.worksheet(worksheet_name)
+            return worksheet
+        except gspread.exceptions.WorksheetNotFound:
+            # Create new worksheet for this reviewer
+            worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=10)
+
+            # Add descriptive headers with clear question formatting
+            headers = [
+                'Timestamp (When Reviewed)',
+                'Reviewer Name',
+                'Image Filename',
+                'Q1: Is the objectness appropriate? (Yes/No)',
+                'Q2: Objects to ADD (if missing from annotation)',
+                'Q3: Objects to SUBTRACT (if incorrectly annotated)',
+                'Q4: Other Comments / Additional Feedback'
+            ]
+            worksheet.append_row(headers)
+
+            # Format the header row
+            worksheet.format('A1:G1', {
+                'textFormat': {'bold': True, 'fontSize': 11},
+                'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
+                'horizontalAlignment': 'CENTER',
+                'wrapStrategy': 'WRAP'
+            })
+
+            # Set column widths for better readability
+            worksheet.set_column_width('A', 180)  # Timestamp
+            worksheet.set_column_width('B', 150)  # Reviewer
+            worksheet.set_column_width('C', 200)  # Image name
+            worksheet.set_column_width('D', 280)  # Q1
+            worksheet.set_column_width('E', 320)  # Q2 - Objects to add
+            worksheet.set_column_width('F', 320)  # Q3 - Objects to subtract
+            worksheet.set_column_width('G', 350)  # Q4 - Comments
+
+            # Freeze header row
+            worksheet.freeze(rows=1)
+
+            return worksheet
+
+    except Exception as e:
+        st.error(f"Error creating reviewer worksheet: {str(e)}")
+        return None
+
 def save_to_google_sheets(reviewer_name, responses):
-    """Save all responses to Google Sheets"""
+    """Save all responses to Google Sheets in reviewer-specific worksheet"""
     if not reviewer_name:
         st.error("Please enter your name before submitting!")
         return False, 0
-    
+
     if not responses:
         st.warning("No reviews to submit yet!")
         return False, 0
-    
-    worksheet = get_gsheet_connection()
+
+    # Get spreadsheet connection
+    spreadsheet = get_gsheet_connection()
+    if spreadsheet is None:
+        return False, 0
+
+    # Get or create reviewer-specific worksheet
+    worksheet = get_reviewer_worksheet(spreadsheet, reviewer_name)
     if worksheet is None:
         return False, 0
-    
+
     try:
         # Prepare rows to append
         rows_to_add = []
@@ -76,13 +124,13 @@ def save_to_google_sheets(reviewer_name, responses):
                 response['other_comments']
             ]
             rows_to_add.append(row)
-        
+
         # Append all rows at once
         if rows_to_add:
             worksheet.append_rows(rows_to_add)
-        
+
         return True, len(rows_to_add)
-        
+
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
         return False, 0
@@ -205,70 +253,8 @@ if not st.session_state.app_started:
     st.markdown("## 📋 Setup Instructions")
 
     st.markdown("""
-    ### 1. Google Sheets Setup with Service Account
-    
-    **One-time setup required for automatic Google Sheets integration:**
-    
-    #### A. Create Service Account (5 minutes)
-    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-    2. Create a new project (or select existing)
-    3. Enable APIs:
-       - **Google Sheets API**
-       - **Google Drive API**
-    4. Create Service Account:
-       - Go to **APIs & Services → Credentials**
-       - Click **Create Credentials → Service Account**
-       - Name it (e.g., "streamlit-app")
-       - Click **Done**
-    5. Generate Key:
-       - Click on the created service account
-       - Go to **Keys** tab
-       - Click **Add Key → Create New Key → JSON**
-       - Download the JSON file
-    
-    #### B. Share Your Google Sheet
-    1. Open your Google Sheet
-    2. Click **Share** button
-    3. Copy the `client_email` from the JSON file (looks like: `something@project.iam.gserviceaccount.com`)
-    4. Add this email as **Editor**
-    
-    #### C. Add to Streamlit Secrets
-    
-    **For Local Development:**
-    
-    Create `.streamlit/secrets.toml`:
-    ```toml
-    [gcp_service_account]
-    type = "service_account"
-    project_id = "your-project-id"
-    private_key_id = "key-id"
-    private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
-    client_email = "your-service-account@project.iam.gserviceaccount.com"
-    client_id = "123456789"
-    auth_uri = "https://accounts.google.com/o/oauth2/auth"
-    token_uri = "https://oauth2.googleapis.com/token"
-    auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-    client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-email"
-    
-    spreadsheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
-    ```
-    
-    **For Streamlit Cloud:**
-    - Go to App Settings → Secrets
-    - Paste the same content
-    
-    #### D. Requirements
-    Make sure `requirements.txt` includes:
-    ```
-    gspread>=6.0.0
-    google-auth>=2.0.0
-    ```
-    """)
 
-    st.markdown("---")
-
-    st.markdown("""
-    ### 2. How to Use This App
+    ### How to Use This App
     
     **Navigation:**
     - Use **Previous/Next** buttons to move between images
@@ -288,7 +274,7 @@ if not st.session_state.app_started:
     
     **Submitting:**
     - Click "Submit All to Google Sheets" when done
-    - All reviews automatically saved to your Google Sheet
+    - All reviews automatically saved to your Google Sheet [ImageNet-ES Meta (CVPR 2026) --> 프로젝트 진행 --> Objectness QA Test 스프레드 시트]
     """)
 
     st.markdown("---")

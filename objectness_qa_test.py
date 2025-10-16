@@ -3,51 +3,85 @@ from PIL import Image
 import os
 import glob
 from datetime import datetime
-import gspread
-from google.oauth2.service_account import Credentials
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
 
 # Configuration
 IMAGE_DIR = "./assets"
-SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
-]
+WORKSHEET_NAME = "Reviews"
 
-# Google Sheets Configuration
-SPREADSHEET_NAME = "Objectness QA Test Results"  # Update with your spreadsheet name
-SHEET_NAME = "Reviews"  # Tab name for reviews
-
-def init_google_sheets():
+@st.cache_resource
+def get_gsheet_connection():
     """Initialize Google Sheets connection"""
     try:
-        # Load credentials from streamlit secrets or local file
-        if 'gcp_service_account' in st.secrets:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            credentials = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-        else:
-            # Fallback to local credentials file
-            credentials = Credentials.from_service_account_file(
-                'credentials.json',
-                scopes=SCOPES
-            )
-
-        client = gspread.authorize(credentials)
-        spreadsheet = client.open(SPREADSHEET_NAME)
-        sheet = spreadsheet.worksheet(SHEET_NAME)
-        return sheet
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        return conn
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {str(e)}")
+        st.info("Make sure you've added the spreadsheet URL to secrets.toml")
         return None
 
-def save_to_google_sheets(sheet, data):
-    """Save review data to Google Sheets"""
+def save_to_google_sheets(reviewer_name, responses):
+    """Save all responses to Google Sheets"""
+    if not reviewer_name:
+        st.error("Please enter your name before submitting!")
+        return False, 0
+    
+    if not responses:
+        st.warning("No reviews to submit yet!")
+        return False, 0
+    
+    conn = get_gsheet_connection()
+    if conn is None:
+        return False, 0
+    
     try:
-        # Append row to sheet
-        sheet.append_row(data)
-        return True
+        # Try to read existing data
+        try:
+            existing_df = conn.read(worksheet=WORKSHEET_NAME, ttl=0)
+            # Ensure columns exist
+            required_columns = [
+                'Timestamp', 'Reviewer', 'Image Name',
+                'Objectness Appropriate', 'Objects to Add',
+                'Objects to Subtract', 'Other Comments'
+            ]
+            for col in required_columns:
+                if col not in existing_df.columns:
+                    existing_df[col] = ''
+        except:
+            # Create new dataframe if sheet is empty
+            existing_df = pd.DataFrame(columns=[
+                'Timestamp', 'Reviewer', 'Image Name',
+                'Objectness Appropriate', 'Objects to Add',
+                'Objects to Subtract', 'Other Comments'
+            ])
+        
+        # Prepare new rows
+        new_rows = []
+        for image_name, response in responses.items():
+            new_rows.append({
+                'Timestamp': response['timestamp'],
+                'Reviewer': reviewer_name,
+                'Image Name': image_name,
+                'Objectness Appropriate': response['objectness_appropriate'],
+                'Objects to Add': response['objects_to_add'],
+                'Objects to Subtract': response['objects_to_subtract'],
+                'Other Comments': response['other_comments']
+            })
+        
+        new_df = pd.DataFrame(new_rows)
+        
+        # Combine and update
+        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
+        
+        # Write to sheet
+        conn.update(worksheet=WORKSHEET_NAME, data=updated_df)
+        
+        return True, len(new_rows)
+        
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
-        return False
+        return False, 0
 
 def get_image_list():
     """Get list of all JPEG images in the assets directory"""
@@ -55,9 +89,7 @@ def get_image_list():
     image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.jpeg")))
     image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.jpg")))
     image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.JPG")))
-    # Sort by filename
     image_files.sort()
-    # Return just filenames
     return [os.path.basename(f) for f in image_files]
 
 # Initialize session state
@@ -100,7 +132,6 @@ def load_saved_response():
         st.session_state.objects_to_subtract = response.get('objects_to_subtract', '')
         st.session_state.other_comments = response.get('other_comments', '')
     else:
-        # Reset to defaults
         st.session_state.objectness_appropriate = 'Yes'
         st.session_state.objects_to_add = ''
         st.session_state.objects_to_subtract = ''
@@ -116,52 +147,6 @@ def save_current_response():
         'other_comments': st.session_state.get('other_comments', ''),
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-
-def submit_to_sheets():
-    """Submit all responses to Google Sheets"""
-    if not st.session_state.reviewer_name:
-        st.error("Please enter your name before submitting!")
-        return False
-
-    sheet = init_google_sheets()
-    if sheet is None:
-        return False
-
-    # Check if headers exist, if not create them
-    try:
-        headers = sheet.row_values(1)
-        if not headers:
-            sheet.append_row([
-                'Timestamp', 'Reviewer', 'Image Name',
-                'Objectness Appropriate', 'Objects to Add',
-                'Objects to Subtract', 'Other Comments'
-            ])
-    except:
-        sheet.append_row([
-            'Timestamp', 'Reviewer', 'Image Name',
-            'Objectness Appropriate', 'Objects to Add',
-            'Objects to Subtract', 'Other Comments'
-        ])
-
-    # Submit all responses
-    success_count = 0
-    for image_name, response in st.session_state.responses.items():
-        data = [
-            response['timestamp'],
-            st.session_state.reviewer_name,
-            image_name,
-            response['objectness_appropriate'],
-            response['objects_to_add'],
-            response['objects_to_subtract'],
-            response['other_comments']
-        ]
-        if save_to_google_sheets(sheet, data):
-            success_count += 1
-
-    if success_count > 0:
-        st.success(f"Successfully submitted {success_count} reviews to Google Sheets!")
-        return True
-    return False
 
 # Page config
 st.set_page_config(
@@ -195,9 +180,6 @@ st.markdown("""
         margin: 0.5rem 0;
         border-left: 4px solid #667eea;
     }
-    .stButton>button {
-        width: 100%;
-    }
     .nav-box {
         background: #e9ecef;
         padding: 1rem;
@@ -219,32 +201,41 @@ if not st.session_state.app_started:
     st.markdown("## 📋 Setup Instructions")
 
     st.markdown("""
-    ### 1. Google Sheets Setup
+    ### 1. Google Sheets Setup (Simple Method)
 
-    This application requires Google Sheets API access to save your reviews.
+    **No Google Cloud Account Required!**
 
-    **Steps to set up:**
+    **Steps:**
 
-    1. **Create a Google Cloud Project**
-       - Go to [Google Cloud Console](https://console.cloud.google.com/)
-       - Create a new project
-       - Enable **Google Sheets API** and **Google Drive API**
-
-    2. **Create Service Account**
-       - Go to IAM & Admin > Service Accounts
-       - Create a service account
-       - Download the JSON credentials file
-       - Save it as `credentials.json` in the Tests directory
-
-    3. **Create Google Spreadsheet**
-       - Create a new spreadsheet named: **"Objectness QA Test Results"**
+    1. **Create a Google Spreadsheet**
+       - Go to [Google Sheets](https://sheets.google.com)
+       - Create a new spreadsheet
+       - Name it anything you want (e.g., "Objectness QA Reviews")
        - Create a worksheet tab named: **"Reviews"**
-       - Share the spreadsheet with the service account email (found in credentials.json)
-       - Give it Editor permissions
 
-    4. **For Streamlit Cloud Deployment**
-       - Add credentials to Streamlit Secrets instead of using credentials.json
-       - See [Streamlit Secrets Documentation](https://docs.streamlit.io/streamlit-community-cloud/deploy-your-app/secrets-management)
+    2. **Share the Spreadsheet**
+       - Click the "Share" button (top right)
+       - Change to: **"Anyone with the link"**
+       - Set permission to: **"Editor"**
+       - Copy the spreadsheet URL
+
+    3. **Add to Streamlit Secrets**
+       - Create `.streamlit/secrets.toml` file in your project directory
+       - Add the following:
+       ```toml
+       [connections.gsheets]
+       spreadsheet = "YOUR_GOOGLE_SHEET_URL_HERE"
+       ```
+       
+    4. **For Streamlit Cloud**
+       - Go to App Settings → Secrets
+       - Paste the same content:
+       ```
+       [connections.gsheets]
+       spreadsheet = "YOUR_GOOGLE_SHEET_URL_HERE"
+       ```
+
+    **That's it!** Much simpler than Service Account setup.
     """)
 
     st.markdown("---")
@@ -276,24 +267,6 @@ if not st.session_state.app_started:
 
     st.markdown("---")
 
-    st.markdown("""
-    ### 3. Data Format
-
-    Your reviews will be saved to Google Sheets with the following columns:
-
-    | Column | Description |
-    |--------|-------------|
-    | Timestamp | When the review was submitted |
-    | Reviewer | Your name |
-    | Image Name | Filename of the reviewed image |
-    | Objectness Appropriate | Yes/No response |
-    | Objects to Add | List of objects to add |
-    | Objects to Subtract | List of objects to remove |
-    | Other Comments | Additional feedback |
-    """)
-
-    st.markdown("---")
-
     # Check if images exist
     total_images = len(st.session_state.images)
     if total_images > 0:
@@ -312,16 +285,14 @@ if not st.session_state.app_started:
                 "🚀 Start Review",
                 on_click=start_app,
                 type="primary",
-                use_container_width=True,
-                key="start_button"
+                use_container_width=True
             )
         else:
             st.button(
                 "🚀 Start Review",
                 type="primary",
                 use_container_width=True,
-                disabled=True,
-                key="start_button_disabled"
+                disabled=True
             )
 
     st.stop()
@@ -362,12 +333,14 @@ with st.sidebar:
     # Submit all button
     st.header("Submit Reviews")
     if st.button("📤 Submit All to Google Sheets", type="primary", use_container_width=True):
-        if reviewed_count == 0:
-            st.warning("No reviews to submit yet!")
-        else:
-            with st.spinner("Submitting to Google Sheets..."):
-                if submit_to_sheets():
-                    st.balloons()
+        with st.spinner("Submitting to Google Sheets..."):
+            success, count = save_to_google_sheets(
+                st.session_state.reviewer_name,
+                st.session_state.responses
+            )
+            if success:
+                st.success(f"✅ Successfully submitted {count} reviews!")
+                st.balloons()
 
     st.divider()
 
@@ -415,7 +388,6 @@ with col2:
         st.rerun()
 
 with col3:
-    # Jump to image number
     jump_to = st.number_input(
         f"Image Number (1-{total_images}):",
         min_value=1,
@@ -432,7 +404,6 @@ with col4:
     st.write(f"**{current_idx + 1} / {total_images}**")
 
 with col5:
-    # Show if this image has been reviewed
     if current_image in st.session_state.responses:
         st.success("✅ Reviewed")
     else:
@@ -525,6 +496,3 @@ with col_qa:
         save_current_response()
         st.success("✅ Response saved!")
         st.rerun()
-
-# Auto-save on navigation
-# The save_current_response() is called before navigation in the button callbacks

@@ -3,7 +3,6 @@ from PIL import Image
 import os
 import glob
 from datetime import datetime
-import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -87,26 +86,6 @@ def save_to_google_sheets(reviewer_name, responses):
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
         return False, 0
-
-def export_to_csv(reviewer_name, responses):
-    """Export responses to downloadable CSV (backup option)"""
-    if not responses:
-        return None
-    
-    rows = []
-    for image_name, response in responses.items():
-        rows.append({
-            'Timestamp': response['timestamp'],
-            'Reviewer': reviewer_name,
-            'Image Name': image_name,
-            'Objectness Appropriate': response['objectness_appropriate'],
-            'Objects to Add': response['objects_to_add'],
-            'Objects to Subtract': response['objects_to_subtract'],
-            'Other Comments': response['other_comments']
-        })
-    
-    df = pd.DataFrame(rows)
-    return df.to_csv(index=False).encode('utf-8')
 
 def get_image_list():
     """Get list of all JPEG images in the assets directory"""
@@ -310,7 +289,6 @@ if not st.session_state.app_started:
     **Submitting:**
     - Click "Submit All to Google Sheets" when done
     - All reviews automatically saved to your Google Sheet
-    - CSV download available as backup
     """)
 
     st.markdown("---")
@@ -325,23 +303,35 @@ if not st.session_state.app_started:
 
     st.markdown("---")
 
+    # Reviewer name input
+    st.markdown("### 👤 Reviewer Information")
+    reviewer_name_input = st.text_input(
+        "Enter your name to begin:",
+        value=st.session_state.reviewer_name,
+        placeholder="Your full name",
+        key="welcome_reviewer_input"
+    )
+
+    st.markdown("---")
+
     # Start button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if total_images > 0:
-            st.button(
-                "🚀 Start Review",
-                on_click=start_app,
-                type="primary",
-                use_container_width=True
-            )
-        else:
-            st.button(
-                "🚀 Start Review",
-                type="primary",
-                use_container_width=True,
-                disabled=True
-            )
+        # Enable button only if name is entered and images exist
+        can_start = total_images > 0 and reviewer_name_input.strip() != ""
+
+        if st.button(
+            "🚀 Start Review",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_start
+        ):
+            st.session_state.reviewer_name = reviewer_name_input.strip()
+            start_app()
+            st.rerun()
+
+        if not reviewer_name_input.strip() and total_images > 0:
+            st.info("👆 Please enter your name above to start")
 
     st.stop()
 
@@ -393,21 +383,6 @@ with st.sidebar:
                 )
                 if success:
                     st.success(f"✅ Successfully submitted {count} reviews!")
-                    st.balloons()
-    
-    # CSV backup download
-    if reviewed_count > 0:
-        st.divider()
-        st.subheader("Backup Option")
-        csv_data = export_to_csv(st.session_state.reviewer_name, st.session_state.responses)
-        if csv_data:
-            st.download_button(
-                label="📥 Download CSV Backup",
-                data=csv_data,
-                file_name=f"review_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
 
     st.divider()
 
@@ -419,7 +394,6 @@ with st.sidebar:
         3. **Navigate** using Prev/Next buttons
         4. Responses are **auto-saved** as you type
         5. Click **Submit All to Google Sheets** when done
-        6. Optionally download CSV backup
 
         **Questions:**
         - **Objectness Appropriate?** - Does annotation identify all objects correctly?

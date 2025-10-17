@@ -261,6 +261,7 @@ if not st.session_state.app_started:
     - 🔵 Blue stars : Clear non-COCO object
     - 🟡 Yellow stars : Flagged object
     - 🟢 Green stars : isCrowd annotations
+    - X No stars : false negative image
 
     **Navigation:**
     - Use **Previous/Next** buttons to move between images

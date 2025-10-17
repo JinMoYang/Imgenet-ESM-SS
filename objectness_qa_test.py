@@ -256,11 +256,11 @@ if not st.session_state.app_started:
     st.markdown("""
 
     ### How to Use This App
-    ** Meaning of Stars: **
-    Red stars : Clear COCO object
-    Blue stars : Clear non-COCO object
-    Yellow stars : Flagged object
-    Green stars : isCrowd annotations
+    **Meaning of Stars:**
+    🔴 Red stars : Clear COCO object
+    🔵 Blue stars : Clear non-COCO object
+    🟡 Yellow stars : Flagged object
+    🟢 Green stars : isCrowd annotations
 
     **Navigation:**
     - Use **Previous/Next** buttons to move between images

@@ -74,13 +74,13 @@ def get_reviewer_worksheet(spreadsheet, reviewer_name):
             })
 
             # Set column widths for better readability
-            worksheet.update_column_width('A', 180)  # Timestamp
-            worksheet.update_column_width('B', 150)  # Reviewer
-            worksheet.update_column_width('C', 200)  # Image name
-            worksheet.update_column_width('D', 280)  # Q1
-            worksheet.update_column_width('E', 320)  # Q2 - Objects to add
-            worksheet.update_column_width('F', 320)  # Q3 - Objects to subtract
-            worksheet.update_column_width('G', 350)  # Q4 - Comments
+            worksheet.set_column_width('A', 180)  # Timestamp
+            worksheet.set_column_width('B', 150)  # Reviewer
+            worksheet.set_column_width('C', 200)  # Image name
+            worksheet.set_column_width('D', 280)  # Q1
+            worksheet.set_column_width('E', 320)  # Q2 - Objects to add
+            worksheet.set_column_width('F', 320)  # Q3 - Objects to subtract
+            worksheet.set_column_width('G', 350)  # Q4 - Comments
 
             # Freeze header row
             worksheet.freeze(rows=1)

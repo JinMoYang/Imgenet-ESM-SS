@@ -180,12 +180,12 @@ def load_saved_response():
     current_image = st.session_state.images[st.session_state.current_image_idx]
     if current_image in st.session_state.responses:
         response = st.session_state.responses[current_image]
-        st.session_state.objectness_appropriate = response.get('objectness_appropriate', 'Yes')
+        st.session_state.objectness_appropriate = response.get('objectness_appropriate', '')
         st.session_state.objects_to_add = response.get('objects_to_add', '')
         st.session_state.objects_to_subtract = response.get('objects_to_subtract', '')
         st.session_state.other_comments = response.get('other_comments', '')
     else:
-        st.session_state.objectness_appropriate = 'Yes'
+        st.session_state.objectness_appropriate = ''
         st.session_state.objects_to_add = ''
         st.session_state.objects_to_subtract = ''
         st.session_state.other_comments = ''
@@ -194,7 +194,7 @@ def save_current_response():
     """Save current response to session state"""
     current_image = st.session_state.images[st.session_state.current_image_idx]
     st.session_state.responses[current_image] = {
-        'objectness_appropriate': st.session_state.get('objectness_appropriate', 'Yes'),
+        'objectness_appropriate': st.session_state.get('objectness_appropriate', ''),
         'objects_to_add': st.session_state.get('objects_to_add', ''),
         'objects_to_subtract': st.session_state.get('objects_to_subtract', ''),
         'other_comments': st.session_state.get('other_comments', ''),
@@ -256,7 +256,12 @@ if not st.session_state.app_started:
     st.markdown("""
 
     ### How to Use This App
-    
+    ** Meaning of Stars: **
+    Red stars : Clear COCO object
+    Blue stars : Clear non-COCO object
+    Yellow stars : Flagged object
+    Green stars : isCrowd annotations
+
     **Navigation:**
     - Use **Previous/Next** buttons to move between images
     - **Jump to Image** - Enter any image number to jump directly
@@ -482,7 +487,7 @@ with col_qa:
         saved = st.session_state.responses[current_image]
     else:
         saved = {
-            'objectness_appropriate': 'Yes',
+            'objectness_appropriate': '',
             'objects_to_add': '',
             'objects_to_subtract': '',
             'other_comments': ''
@@ -493,7 +498,7 @@ with col_qa:
     objectness = st.radio(
         "**1. Is the objectness appropriate?**",
         options=["Yes", "No"],
-        index=0 if saved['objectness_appropriate'] == 'Yes' else 1,
+        index=None,
         key="q1_objectness",
         horizontal=True
     )

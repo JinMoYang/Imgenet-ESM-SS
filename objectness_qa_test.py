@@ -8,13 +8,12 @@ from google.oauth2.service_account import Credentials
 
 # Configuration
 IMAGE_DIR = "./assets/objectness_original"
-IMAGE_DIR_2 = "./assets/objectness_checked"  # Second version directory
+IMAGE_DIR_2 = "./assets/objectness_checked"
 
 @st.cache_resource
 def get_gsheet_connection():
     """Initialize Google Sheets connection and return spreadsheet"""
     try:
-        # Get credentials from Streamlit secrets
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=[
@@ -22,119 +21,102 @@ def get_gsheet_connection():
                 "https://www.googleapis.com/auth/drive"
             ]
         )
-
         client = gspread.authorize(credentials)
-
-        # Open spreadsheet by URL
-        # spreadsheet = client.open_by_url(st.secrets["spreadsheet_url"])
         spreadsheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1sPD3BKub_lITqwvo51SQ7C35AMMJGeD8T2FshSzaUT4/edit")
-
         return spreadsheet
-
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {str(e)}")
-        st.info("Make sure you've set up Service Account credentials in secrets")
         return None
 
-def get_reviewer_worksheet(spreadsheet, reviewer_name):
-    """Get or create a worksheet for specific reviewer with formatted headers"""
+def get_or_create_reviewer_worksheet(spreadsheet, reviewer_name):
+    """Get or create a worksheet for specific reviewer"""
     if not spreadsheet or not reviewer_name:
         return None
-
+    
     try:
-        # Sanitize reviewer name for worksheet title (max 100 chars)
         worksheet_name = reviewer_name.strip()[:100]
-
+        
         # Try to get existing worksheet
         try:
             worksheet = spreadsheet.worksheet(worksheet_name)
             return worksheet
         except gspread.exceptions.WorksheetNotFound:
-            # Create new worksheet for this reviewer
+            # Create new worksheet
             worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=10)
-
-            # Add descriptive headers with clear question formatting
+            
+            # Add headers
             headers = [
-                'Timestamp (When Reviewed)',
+                'Timestamp',
                 'Reviewer Name',
                 'Image Filename',
-                'Q1: Is the objectness appropriate? (Yes/No)',
-                'Q2: Objects to ADD (if missing from annotation)',
-                'Q3: Objects to SUBTRACT (if incorrectly annotated)',
-                'Q4: Other Comments / Additional Feedback'
+                'Q1: Objectness Appropriate?',
+                'Q2: Objects to ADD',
+                'Q3: Objects to SUBTRACT',
+                'Q4: Other Comments'
             ]
             worksheet.append_row(headers)
-
-            # Format the header row
+            
+            # Format header row
             worksheet.format('A1:G1', {
                 'textFormat': {'bold': True, 'fontSize': 11},
                 'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
                 'horizontalAlignment': 'CENTER',
                 'wrapStrategy': 'WRAP'
             })
-
-            # Set column widths for better readability
-            worksheet.set_column_width('A', 180)  # Timestamp
-            worksheet.set_column_width('B', 150)  # Reviewer
-            worksheet.set_column_width('C', 200)  # Image name
-            worksheet.set_column_width('D', 280)  # Q1
-            worksheet.set_column_width('E', 320)  # Q2 - Objects to add
-            worksheet.set_column_width('F', 320)  # Q3 - Objects to subtract
-            worksheet.set_column_width('G', 350)  # Q4 - Comments
-
+            
             # Freeze header row
             worksheet.freeze(rows=1)
-
+            
             return worksheet
-
     except Exception as e:
-        st.error(f"Error creating reviewer worksheet: {str(e)}")
+        st.error(f"Error with worksheet: {str(e)}")
         return None
 
-def save_to_google_sheets(reviewer_name, responses):
-    """Save all responses to Google Sheets in reviewer-specific worksheet"""
-    if not reviewer_name:
-        st.error("Please enter your name before submitting!")
-        return False, 0
-
-    if not responses:
-        st.warning("No reviews to submit yet!")
-        return False, 0
-
-    # Get spreadsheet connection
+def append_single_review_to_sheet(reviewer_name, image_name, response):
+    """Append a single review to Google Sheets immediately"""
+    if not reviewer_name or not response:
+        return False
+    
     spreadsheet = get_gsheet_connection()
     if spreadsheet is None:
-        return False, 0
-
-    # Get or create reviewer-specific worksheet
-    worksheet = get_reviewer_worksheet(spreadsheet, reviewer_name)
+        return False
+    
+    worksheet = get_or_create_reviewer_worksheet(spreadsheet, reviewer_name)
     if worksheet is None:
-        return False, 0
-
+        return False
+    
     try:
-        # Prepare rows to append
-        rows_to_add = []
-        for image_name, response in responses.items():
-            row = [
-                response['timestamp'],
-                reviewer_name,
-                image_name,
-                response['objectness_appropriate'],
-                response['objects_to_add'],
-                response['objects_to_subtract'],
-                response['other_comments']
-            ]
-            rows_to_add.append(row)
-
-        # Append all rows at once
-        if rows_to_add:
-            worksheet.append_rows(rows_to_add)
-
-        return True, len(rows_to_add)
-
+        row = [
+            response.get('timestamp', ''),
+            reviewer_name,
+            image_name,
+            response.get('objectness_appropriate', ''),
+            response.get('objects_to_add', ''),
+            response.get('objects_to_subtract', ''),
+            response.get('other_comments', '')
+        ]
+        worksheet.append_row(row)
+        return True
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
-        return False, 0
+        return False
+
+def check_if_image_already_reviewed(reviewer_name, image_name):
+    """Check if this image has already been saved to Google Sheets"""
+    spreadsheet = get_gsheet_connection()
+    if spreadsheet is None:
+        return False
+    
+    try:
+        worksheet = get_or_create_reviewer_worksheet(spreadsheet, reviewer_name)
+        if worksheet is None:
+            return False
+        
+        # Get all values from the image filename column (column C, index 3)
+        all_values = worksheet.col_values(3)
+        return image_name in all_values
+    except:
+        return False
 
 def get_image_list():
     """Get list of all JPEG images in the assets directory"""
@@ -152,10 +134,19 @@ if 'current_image_idx' not in st.session_state:
     st.session_state.responses = {}
     st.session_state.images = get_image_list()
     st.session_state.app_started = False
+    st.session_state.saved_to_sheet = set()  # Track which images are saved to sheet
 
 def start_app():
-    """Start the review app"""
-    st.session_state.app_started = True
+    """Start the review app and create worksheet"""
+    if st.session_state.reviewer_name.strip():
+        # Create worksheet when app starts
+        spreadsheet = get_gsheet_connection()
+        if spreadsheet:
+            worksheet = get_or_create_reviewer_worksheet(spreadsheet, st.session_state.reviewer_name)
+            if worksheet:
+                st.session_state.app_started = True
+                return True
+    return False
 
 def go_to_image(idx):
     """Navigate to specific image index"""
@@ -191,15 +182,33 @@ def load_saved_response():
         st.session_state.other_comments = ''
 
 def save_current_response():
-    """Save current response to session state"""
+    """Save current response to session state AND Google Sheets"""
     current_image = st.session_state.images[st.session_state.current_image_idx]
-    st.session_state.responses[current_image] = {
+    
+    # Prepare response data
+    response_data = {
         'objectness_appropriate': st.session_state.get('objectness_appropriate', ''),
         'objects_to_add': st.session_state.get('objects_to_add', ''),
         'objects_to_subtract': st.session_state.get('objects_to_subtract', ''),
         'other_comments': st.session_state.get('other_comments', ''),
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+    
+    # Save to session state
+    st.session_state.responses[current_image] = response_data
+    
+    # Save to Google Sheets (only if not already saved)
+    if current_image not in st.session_state.saved_to_sheet:
+        if st.session_state.reviewer_name:
+            success = append_single_review_to_sheet(
+                st.session_state.reviewer_name,
+                current_image,
+                response_data
+            )
+            if success:
+                st.session_state.saved_to_sheet.add(current_image)
+                return True
+    return False
 
 # Page config
 st.set_page_config(
@@ -254,7 +263,6 @@ if not st.session_state.app_started:
     st.markdown("## 📋 Setup Instructions")
 
     st.markdown("""
-
     ### How to Use This App
     **Meaning of Stars:**
     - 🔴 Red stars : Clear COCO object
@@ -275,13 +283,10 @@ if not st.session_state.app_started:
     4. **Other comments** - Additional feedback or observations
     
     **Saving Your Work:**
-    - Responses auto-save when you navigate to another image
-    - Click "Save Response" button to manually save
-    - Your progress persists during the session
-    
-    **Submitting:**
-    - Click "Submit All to Google Sheets" when done
-    - All reviews automatically saved to your Google Sheet [ImageNet-ES Meta (CVPR 2026) --> 프로젝트 진행 --> Objectness QA Test 스프레드 시트]
+    - Click "Save Response" to save the current image review
+    - **Each save automatically uploads to Google Sheets**
+    - Your worksheet is created when you start the app
+    - All reviews are immediately backed up to the cloud
     """)
 
     st.markdown("---")
@@ -310,7 +315,6 @@ if not st.session_state.app_started:
     # Start button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # Enable button only if name is entered and images exist
         can_start = total_images > 0 and reviewer_name_input.strip() != ""
 
         if st.button(
@@ -320,8 +324,12 @@ if not st.session_state.app_started:
             disabled=not can_start
         ):
             st.session_state.reviewer_name = reviewer_name_input.strip()
-            start_app()
-            st.rerun()
+            with st.spinner("Creating your worksheet..."):
+                if start_app():
+                    st.success("✅ Worksheet created successfully!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to create worksheet. Please check your connection.")
 
         if not reviewer_name_input.strip() and total_images > 0:
             st.info("👆 Please enter your name above to start")
@@ -336,16 +344,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Reviewer name input (sidebar)
+# Sidebar
 with st.sidebar:
     st.header("Reviewer Information")
-    reviewer_name = st.text_input(
-        "Your Name:",
-        value=st.session_state.reviewer_name,
-        key="reviewer_input"
-    )
-    if reviewer_name:
-        st.session_state.reviewer_name = reviewer_name
+    st.info(f"👤 **{st.session_state.reviewer_name}**")
 
     st.divider()
 
@@ -353,7 +355,10 @@ with st.sidebar:
     st.header("Progress")
     total_images = len(st.session_state.images)
     reviewed_count = len(st.session_state.responses)
+    saved_count = len(st.session_state.saved_to_sheet)
+    
     st.metric("Images Reviewed", f"{reviewed_count} / {total_images}")
+    st.metric("Saved to Sheets", f"{saved_count} / {total_images}")
 
     if total_images > 0:
         progress = reviewed_count / total_images
@@ -361,44 +366,21 @@ with st.sidebar:
 
     st.divider()
 
-    # Submit options
-    st.header("Submit Reviews")
-    
-    # Google Sheets submit
-    if st.button("📤 Submit All to Google Sheets", type="primary", use_container_width=True):
-        if reviewed_count == 0:
-            st.warning("No reviews to submit yet!")
-        else:
-            with st.spinner("Submitting to Google Sheets..."):
-                success, count = save_to_google_sheets(
-                    st.session_state.reviewer_name,
-                    st.session_state.responses
-                )
-                if success:
-                    st.success(f"✅ Successfully submitted {count} reviews!")
-
-    st.divider()
-
     # Instructions
     with st.expander("📋 Instructions"):
         st.markdown("""
-        1. **Enter your name** in the sidebar
-        2. **Review each image** and answer the questions
+        1. **Review each image** and answer the questions
+        2. **Click "Save Response"** - auto-uploads to Google Sheets
         3. **Navigate** using Prev/Next buttons
-        4. Responses are **auto-saved** as you type
-        5. Click **Submit All to Google Sheets** when done
-
-        **Questions:**
-        - **Objectness Appropriate?** - Does annotation identify all objects correctly?
-        - **Objects to Add** - Missing objects
-        - **Objects to Subtract** - Incorrectly annotated objects
-        - **Other Comments** - Additional feedback
-        """)
+        4. Your worksheet: **{name}**
+        
+        **Auto-save:** Each time you click Save Response, 
+        your review is immediately added to Google Sheets!
+        """.format(name=st.session_state.reviewer_name))
 
 # Check if images exist
 if not st.session_state.images:
     st.error(f"❌ No images found in {IMAGE_DIR} directory!")
-    st.info("Please add JPEG images to the ./assets/ directory.")
     st.stop()
 
 # Main content area
@@ -412,13 +394,11 @@ col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
 
 with col1:
     if st.button("⬅️ Previous", disabled=(current_idx == 0)):
-        save_current_response()
         prev_image()
         st.rerun()
 
 with col2:
     if st.button("Next ➡️", disabled=(current_idx >= total_images - 1)):
-        save_current_response()
         next_image()
         st.rerun()
 
@@ -431,7 +411,6 @@ with col3:
         key="jump_input"
     )
     if st.button("Jump to Image"):
-        save_current_response()
         go_to_image(jump_to - 1)
         st.rerun()
 
@@ -439,10 +418,12 @@ with col4:
     st.write(f"**{current_idx + 1} / {total_images}**")
 
 with col5:
-    if current_image in st.session_state.responses:
-        st.success("✅ Reviewed")
+    if current_image in st.session_state.saved_to_sheet:
+        st.success("✅ Saved")
+    elif current_image in st.session_state.responses:
+        st.warning("💾 Local")
     else:
-        st.warning("⏳ Pending")
+        st.info("⏳ New")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -472,11 +453,11 @@ with col_img2:
         image_2 = Image.open(image_path_2)
         st.image(image_2, caption=current_image, use_container_width=True)
     else:
-        st.warning(f"⚠️ Version 2 not found: {image_path_2}")
+        st.warning(f"⚠️ Version 2 not found")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Questions section below images
+# Questions section
 st.markdown("---")
 st.subheader("Review Questions")
 
@@ -494,23 +475,23 @@ with col_qa:
             'other_comments': ''
         }
 
-    # Q1: Is objectness appropriate?
+    # Q1
     st.markdown('<div class="question-box">', unsafe_allow_html=True)
     objectness = st.radio(
         "**1. Is the objectness appropriate?**",
         options=["Yes", "No"],
-        index=None,
+        index=["Yes", "No"].index(saved['objectness_appropriate']) if saved['objectness_appropriate'] in ["Yes", "No"] else None,
         key="q1_objectness",
         horizontal=True
     )
     st.session_state.objectness_appropriate = objectness
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Q2: Objects to add
+    # Q2
     st.markdown('<div class="question-box">', unsafe_allow_html=True)
     st.write("**2. If not, should we add objects?**")
     objects_add = st.text_area(
-        "List objects to add (one per line or comma-separated):",
+        "List objects to add:",
         value=saved['objects_to_add'],
         key="q2_add",
         height=100,
@@ -519,11 +500,11 @@ with col_qa:
     st.session_state.objects_to_add = objects_add
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Q3: Objects to subtract
+    # Q3
     st.markdown('<div class="question-box">', unsafe_allow_html=True)
     st.write("**3. If not, should we subtract objects?**")
     objects_subtract = st.text_area(
-        "List objects to remove (one per line or comma-separated):",
+        "List objects to remove:",
         value=saved['objects_to_subtract'],
         key="q3_subtract",
         height=100,
@@ -532,7 +513,7 @@ with col_qa:
     st.session_state.objects_to_subtract = objects_subtract
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Q4: Other comments
+    # Q4
     st.markdown('<div class="question-box">', unsafe_allow_html=True)
     st.write("**4. Any other comments?**")
     other = st.text_area(
@@ -540,13 +521,18 @@ with col_qa:
         value=saved['other_comments'],
         key="q4_other",
         height=100,
-        placeholder="Any other observations or suggestions..."
+        placeholder="Any other observations..."
     )
     st.session_state.other_comments = other
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Save button
-    if st.button("💾 Save Response", type="primary", use_container_width=True):
-        save_current_response()
-        st.success("✅ Response saved!")
-        st.rerun()
+    if st.button("💾 Save Response & Upload to Sheets", type="primary", use_container_width=True):
+        with st.spinner("Saving to Google Sheets..."):
+            if save_current_response():
+                st.success("✅ Response saved and uploaded to Google Sheets!")
+                st.balloons()
+                st.rerun()
+            else:
+                st.info("💾 Response saved locally (already in Sheets or connection issue)")
+                st.rerun()

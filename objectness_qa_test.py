@@ -476,14 +476,24 @@ with col_qa:
 
     # Q1
     st.markdown('<div class="question-box">', unsafe_allow_html=True)
+    
+    # Determine the index for radio button
+    saved_value = saved.get('objectness_appropriate', '')
+    if saved_value == "Yes":
+        radio_index = 0
+    elif saved_value == "No":
+        radio_index = 1
+    else:
+        radio_index = None  # No selection (default)
+    
     objectness = st.radio(
         "**1. Is the objectness appropriate?**",
         options=["Yes", "No"],
-        index=["Yes", "No"].index(saved['objectness_appropriate']) if saved['objectness_appropriate'] in ["Yes", "No"] else None,
+        index=radio_index,
         key="q1_objectness",
         horizontal=True
     )
-    st.session_state.objectness_appropriate = objectness
+    st.session_state.objectness_appropriate = objectness if objectness else ''
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Q2

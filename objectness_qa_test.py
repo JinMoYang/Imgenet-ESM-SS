@@ -182,7 +182,7 @@ def load_saved_response():
         st.session_state.other_comments = ''
 
 def save_current_response():
-    """Save current response to session state AND Google Sheets"""
+    """Save current response to session state AND Google Sheets (always creates new row)"""
     current_image = st.session_state.images[st.session_state.current_image_idx]
     
     # Prepare response data
@@ -194,20 +194,19 @@ def save_current_response():
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     
-    # Save to session state
+    # Save to session state (for UI display)
     st.session_state.responses[current_image] = response_data
     
-    # Save to Google Sheets (only if not already saved)
-    if current_image not in st.session_state.saved_to_sheet:
-        if st.session_state.reviewer_name:
-            success = append_single_review_to_sheet(
-                st.session_state.reviewer_name,
-                current_image,
-                response_data
-            )
-            if success:
-                st.session_state.saved_to_sheet.add(current_image)
-                return True
+    # Always save to Google Sheets (creates new row even if already exists)
+    if st.session_state.reviewer_name:
+        success = append_single_review_to_sheet(
+            st.session_state.reviewer_name,
+            current_image,
+            response_data
+        )
+        if success:
+            st.session_state.saved_to_sheet.add(current_image)
+            return True
     return False
 
 # Page config
@@ -526,13 +525,16 @@ with col_qa:
     st.session_state.other_comments = other
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Save button
+    # Save button - always creates new row and moves to next image
     if st.button("💾 Save Response & Upload to Sheets", type="primary", use_container_width=True):
         with st.spinner("Saving to Google Sheets..."):
             if save_current_response():
-                st.success("✅ Response saved and uploaded to Google Sheets!")
-                st.balloons()
+                st.success("✅ Response saved!")
+                # Auto-advance to next image if not at the end
+                if st.session_state.current_image_idx < len(st.session_state.images) - 1:
+                    st.session_state.current_image_idx += 1
+                    load_saved_response()
                 st.rerun()
             else:
-                st.info("💾 Response saved locally (already in Sheets or connection issue)")
+                st.error("❌ Failed to save to Google Sheets. Please try again.")
                 st.rerun()

@@ -265,8 +265,8 @@ if not st.session_state.app_started:
     ### How to Use This App
     **Meaning of Stars:**
     - 🔴 Red stars : Clear COCO object
-    - 🔵 Blue stars : Clear non-COCO object
-    - 🟡 Yellow stars : Flagged object
+    - 🔵 Blue stars : (Ignore this) Clear non-COCO object
+    - 🟡 Yellow stars : (Ignore this) Flagged object
     - 🟢 Green stars : isCrowd annotations
     - 🚫 No stars : false negative images
 

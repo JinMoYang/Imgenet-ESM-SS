@@ -34,7 +34,7 @@ QUESTIONS = [
         "answers": {
             "Q4": [5],
             "Q5": ["Broccoli, Bell Peppers, Garlic"],
-            "Q6": ["No"]
+            "Q6": ["Yes, partially"]
         }
     },
     {
@@ -205,7 +205,7 @@ if not st.session_state.test_started:
     ### 📋 Instructions
     - Look at each image carefully
     - Count how many objects need to be annotated
-    - List all object classes you can identify
+    - List all object classes you can identify (enter the class name in "lowercase" and in "singular form")
     - Verify if the classes are in COCO taxonomy
     - Click "Submit Answers" to proceed to the next image
     """)

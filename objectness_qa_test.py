@@ -1,3 +1,34 @@
+"""
+Objectness QA Test - Merged Annotations Review Application
+
+This Streamlit app allows reviewers to assess merged image annotations from multiple annotators.
+Reviewers can evaluate objectness quality, suggest object additions/subtractions, and provide
+feedback that is automatically saved to Google Sheets.
+
+DIRECTORY STRUCTURE REQUIREMENTS:
+    Tests/
+    ├── objectness_qa_test.py
+    └── assets/
+        ├── original/                      # Place all IMAGE files here (.png, .jpg, .JPEG, etc.)
+        │   ├── image1.png
+        │   ├── image2.JPEG
+        │   └── ...
+        └── merged_results/
+            └── merged_annotations/        # Place all JSON annotation files here
+                ├── image1.json            # Must match image filename (image1.png -> image1.json)
+                ├── image2.json
+                └── ...
+
+HOW IT WORKS:
+    1. App scans ./assets/original/ for all image files
+    2. Filters to only show images that have matching JSON files in ./assets/merged_results/merged_annotations/
+    3. Displays images with polygon overlays from annotations
+    4. Reviewers answer questions and save responses (auto-uploaded to Google Sheets)
+
+USAGE:
+    streamlit run objectness_qa_test.py
+"""
+
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import os

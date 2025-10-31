@@ -303,27 +303,27 @@ def merge_polygons(polygons: List, method: str) -> List[List[float]]:
 
 
 def match_shapes_across_annotators(
-    shapes_lists: List[List[Dict]]
+    grouped_shapes_lists: List[List[Dict]]
 ) -> List[Tuple[int, int, int]]:
     """
     Match shapes across 3 annotators using IoU-based Hungarian algorithm.
 
     Args:
-        shapes_lists: List of 3 shape lists, one from each annotator
+        grouped_shapes_lists: List of 3 grouped shape lists (output from group_shapes_by_group_id)
 
     Returns:
-        List of tuples (idx0, idx1, idx2) representing matched shape indices
+        List of tuples (idx0, idx1, idx2) representing matched grouped shape indices
     """
-    if len(shapes_lists) != 3:
+    if len(grouped_shapes_lists) != 3:
         return []
 
-    # Convert all shapes to polygons
+    # Convert all grouped shapes to polygons/multipolygons
     all_polygons = []
-    for shapes in shapes_lists:
+    for grouped_shapes in grouped_shapes_lists:
         polygons = []
-        for shape in shapes:
+        for grouped_shape in grouped_shapes:
             try:
-                poly = polygon_from_points(shape['points'])
+                poly = shapes_to_polygon(grouped_shape)
                 polygons.append(poly)
             except:
                 polygons.append(None)
@@ -465,30 +465,31 @@ def process_image_annotations(
         report['vote_status'] = f'wrong_count_{len(annotations)}'
         return None, report
 
-    # Extract shapes from each annotator
-    all_shapes = []
+    # Extract shapes from each annotator and group by group_id
+    all_grouped_shapes = []
     for ann in annotations:
         shapes = ann['data'].get('shapes', [])
-        all_shapes.append(shapes)
+        grouped = group_shapes_by_group_id(shapes)
+        all_grouped_shapes.append(grouped)
 
     # Check if all annotators have shapes
-    shape_counts = [len(shapes) for shapes in all_shapes]
-    if any(count == 0 for count in shape_counts):
+    object_counts = [len(grouped) for grouped in all_grouped_shapes]
+    if any(count == 0 for count in object_counts):
         report['mask_error'] = True
         report['vote_status'] = 'no_shapes'
         return None, report
 
     # Check if all annotators have the same number of objects
-    if len(set(shape_counts)) != 1:
+    if len(set(object_counts)) != 1:
         report['mask_error'] = True
-        report['vote_status'] = f'count_mismatch_{shape_counts}'
+        report['vote_status'] = f'count_mismatch_{object_counts}'
         return None, report
 
-    num_objects = shape_counts[0]
+    num_objects = object_counts[0]
     report['num_objects'] = num_objects
 
     # Match shapes across annotators using IoU
-    matches = match_shapes_across_annotators(all_shapes)
+    matches = match_shapes_across_annotators(all_grouped_shapes)
 
     # Check if we got the expected number of matches
     if len(matches) != num_objects:
@@ -503,17 +504,18 @@ def process_image_annotations(
     all_labels = []
 
     for match_idx, (idx0, idx1, idx2) in enumerate(matches):
-        # Get the three matched shapes
-        shape0 = all_shapes[0][idx0]
-        shape1 = all_shapes[1][idx1]
-        shape2 = all_shapes[2][idx2]
+        # Get the three matched grouped shapes
+        grouped0 = all_grouped_shapes[0][idx0]
+        grouped1 = all_grouped_shapes[1][idx1]
+        grouped2 = all_grouped_shapes[2][idx2]
 
-        matched_shapes = [shape0, shape1, shape2]
-        labels = [s['label'] for s in matched_shapes]
+        matched_grouped = [grouped0, grouped1, grouped2]
+        labels = [g['label'] for g in matched_grouped]
+        group_ids = [g['group_id'] for g in matched_grouped]
 
-        # Convert to polygons
+        # Convert to polygons/multipolygons
         try:
-            polygons = [polygon_from_points(s['points']) for s in matched_shapes]
+            polygons = [shapes_to_polygon(g) for g in matched_grouped]
         except Exception as e:
             report['mask_error'] = True
             report['vote_status'] = f'invalid_polygon_obj{match_idx}: {e}'
@@ -565,13 +567,19 @@ def process_image_annotations(
         all_labels.append(final_label)
 
         # Add merged shape
+        # Note: Output is always a single polygon even if inputs had multiple parts (group_id)
+        # because merge functions combine all parts into one
+        group_id_info = ""
+        if any(gid is not None for gid in group_ids):
+            group_id_info = f" (from grouped shapes: {group_ids})"
+
         merged_shapes.append({
             'label': final_label,
             'points': merged_points,
             'group_id': None,
             'shape_type': 'polygon',
             'flags': {},
-            'description': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}',
+            'description': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}{group_id_info}',
             'score': None,
             'difficult': False,
             'attributes': {},

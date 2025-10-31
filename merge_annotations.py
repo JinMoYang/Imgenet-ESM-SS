@@ -4,6 +4,71 @@ Merge annotation JSON files from multiple annotators with quality control.
 
 This script merges LabelMe-format annotations from 3 annotators per image,
 performing IoU-based quality checks and label voting.
+
+=============================================================================
+DIRECTORY STRUCTURE REQUIREMENTS
+=============================================================================
+
+Expected input directory structure:
+    annotations/
+    ├── annotator1/
+    │   ├── image1.json
+    │   ├── image2.json
+    │   └── ...
+    ├── annotator2/
+    │   ├── image1.json
+    │   ├── image2.json
+    │   └── ...
+    └── annotator3/
+        ├── image1.json
+        ├── image2.json
+        └── ...
+
+Output directory structure (created automatically):
+    merged_results/
+    ├── merged_annotations/      # Individual merged JSON files
+    │   ├── image1.json
+    │   ├── image2.json
+    │   └── ...
+    └── merge_report.csv         # Quality control report
+
+=============================================================================
+GROUP_ID SUPPORT
+=============================================================================
+
+This script supports multi-part annotations using LabelMe's group_id field.
+If an object consists of multiple disconnected regions (e.g., a lemon with
+an occluded part), annotators can assign the same group_id to all parts,
+and they will be treated as a single object during matching and IoU calculation.
+
+Example use case:
+- Object 1: Main body of lemon (group_id: 1)
+- Object 2: Occluded part of lemon (group_id: 1)
+- Object 3: Another lemon (group_id: 2)
+
+The script will:
+1. Group shapes with same group_id into one object (1 & 2 → one object)
+2. Convert to MultiPolygon for IoU calculation
+3. Match across annotators based on combined IoU
+4. Merge all parts into a single polygon in output
+
+=============================================================================
+QUALITY CONTROL PROCESS
+=============================================================================
+
+For each image:
+1. Check that exactly 3 annotators provided annotations
+2. Group shapes by group_id (shapes with same group_id = 1 object)
+3. Verify all annotators marked the same number of objects
+4. Match objects across annotators using IoU-based Hungarian algorithm
+5. For each matched object:
+   - Calculate pairwise IoU between all 3 annotations
+   - Reject if minimum IoU < threshold (default: 0.5)
+   - Vote on label (unanimous or majority required)
+   - Merge polygons using specified method (union/intersection)
+6. Output merged annotation only if all checks pass
+
+=============================================================================
 """
 
 import argparse
@@ -46,9 +111,9 @@ def parse_args():
     parser.add_argument(
         '--merge-method',
         type=str,
-        choices=['union', 'average', 'intersection'],
+        choices=['union', 'intersection'],
         default='union',
-        help='Method to merge polygons: union (largest), average (middle), intersection (conservative)'
+        help='Method to merge polygons: union (largest) or intersection (conservative)'
     )
     return parser.parse_args()
 
@@ -72,17 +137,54 @@ def group_shapes_by_group_id(shapes: List[Dict]) -> List[Dict]:
     """
     Group shapes by their group_id. Shapes with the same group_id are treated as one object.
 
+    This is the KEY function that enables multi-part annotation support.
+
+    IMPORTANT: This function changes the unit of comparison from individual shapes
+    to logical objects. Multiple disconnected shapes with the same group_id become
+    ONE object for the purposes of:
+    - Object counting (3 shapes with group_id=1 count as 1 object)
+    - IoU calculation (all parts combined)
+    - Label voting (one vote per object, not per shape)
+
+    Example:
+        Input shapes:
+        [
+            {'label': 'lemon', 'group_id': 1, 'points': [...]},  # Main body
+            {'label': 'lemon', 'group_id': 1, 'points': [...]},  # Occluded part
+            {'label': 'apple', 'group_id': None, 'points': [...]}  # Separate object
+        ]
+
+        Output grouped shapes:
+        [
+            {
+                'shapes': [shape1, shape2],  # Both parts of the lemon
+                'group_id': 1,
+                'label': 'lemon'
+            },
+            {
+                'shapes': [shape3],  # The apple
+                'group_id': None,
+                'label': 'apple'
+            }
+        ]
+
     Args:
-        shapes: List of shape dictionaries from LabelMe format
+        shapes: List of shape dictionaries from LabelMe format, where each shape may have:
+                - 'label': object class name
+                - 'group_id': integer or None (None means ungrouped)
+                - 'points': list of [x, y] coordinates
+                - other LabelMe fields...
 
     Returns:
-        List of grouped shape dictionaries, where each dict represents one object
-        (possibly with multiple polygons if they share a group_id)
+        List of grouped shape dictionaries, where each dict represents ONE LOGICAL OBJECT
+        with fields:
+        - 'shapes': list of one or more shape dicts (multiple if grouped)
+        - 'group_id': the shared group_id or None
+        - 'label': the object label (from first shape if grouped)
     """
     from collections import OrderedDict
 
-    # Group shapes by group_id
-    # Use OrderedDict to preserve order
+    # Use OrderedDict to preserve annotation order (important for consistent matching)
     grouped = OrderedDict()
     ungrouped = []
 
@@ -91,13 +193,14 @@ def group_shapes_by_group_id(shapes: List[Dict]) -> List[Dict]:
 
         if group_id is None:
             # No group_id - treat as individual object
+            # Each ungrouped shape becomes its own object
             ungrouped.append({
                 'shapes': [shape],
                 'group_id': None,
                 'label': shape['label']
             })
         else:
-            # Has group_id - add to group
+            # Has group_id - add to existing group or create new one
             if group_id not in grouped:
                 grouped[group_id] = {
                     'shapes': [],
@@ -106,7 +209,8 @@ def group_shapes_by_group_id(shapes: List[Dict]) -> List[Dict]:
                 }
             grouped[group_id]['shapes'].append(shape)
 
-    # Combine grouped and ungrouped
+    # Combine grouped and ungrouped objects
+    # Order: grouped objects first (by first appearance), then ungrouped
     result = list(grouped.values()) + ungrouped
     return result
 
@@ -115,21 +219,61 @@ def shapes_to_polygon(grouped_shape: Dict):
     """
     Convert grouped shape(s) to Shapely Polygon or MultiPolygon.
 
+    This function bridges the gap between LabelMe's annotation format and Shapely's
+    geometry objects, handling both single-part and multi-part objects.
+
+    KEY BEHAVIOR:
+    - If grouped_shape has 1 shape: Returns Polygon (single region)
+    - If grouped_shape has 2+ shapes: Returns MultiPolygon (disconnected regions)
+
+    The resulting geometry is used for:
+    1. IoU calculation between annotators
+    2. Hungarian algorithm matching
+    3. Polygon merging
+
+    Example 1 - Single part object:
+        grouped_shape = {
+            'shapes': [{'points': [[0,0], [1,0], [1,1], [0,1]]}],
+            'group_id': None,
+            'label': 'apple'
+        }
+        → Returns: Polygon with 4 vertices
+
+    Example 2 - Multi-part object (same group_id):
+        grouped_shape = {
+            'shapes': [
+                {'points': [[0,0], [1,0], [1,1], [0,1]]},  # Main body
+                {'points': [[2,2], [3,2], [3,3], [2,3]]}   # Occluded part
+            ],
+            'group_id': 1,
+            'label': 'lemon'
+        }
+        → Returns: MultiPolygon with 2 separate polygons
+
     Args:
-        grouped_shape: Dict with 'shapes' list (output from group_shapes_by_group_id)
+        grouped_shape: Dict with fields:
+                      - 'shapes': list of shape dicts (from group_shapes_by_group_id)
+                      - 'group_id': integer or None
+                      - 'label': object label
 
     Returns:
         Shapely Polygon (if single shape) or MultiPolygon (if multiple shapes)
+
+    Raises:
+        ValueError: If any shape has < 3 points (via polygon_from_points)
     """
     from shapely.geometry import MultiPolygon
 
     shapes = grouped_shape['shapes']
 
     if len(shapes) == 1:
-        # Single shape - return Polygon
+        # Single shape - return simple Polygon
+        # This is the most common case (ungrouped annotations)
         return polygon_from_points(shapes[0]['points'])
     else:
-        # Multiple shapes - return MultiPolygon
+        # Multiple shapes with same group_id - return MultiPolygon
+        # Each part becomes a separate polygon within the MultiPolygon
+        # IoU calculation will consider the union of all parts
         polygons = [polygon_from_points(shape['points']) for shape in shapes]
         return MultiPolygon(polygons)
 
@@ -229,65 +373,13 @@ def merge_polygons_intersection(polygons: List) -> List[List[float]]:
     coords = list(merged.exterior.coords[:-1])
     return [[float(x), float(y)] for x, y in coords]
 
-
-def merge_polygons_average(polygons: List) -> List[List[float]]:
-    """
-    Merge polygons by averaging coordinates.
-    Note: This assumes polygons have similar number of points and shape.
-    For MultiPolygons, takes union first to create a single polygon.
-
-    Args:
-        polygons: List of Shapely Polygon or MultiPolygon objects
-
-    Returns:
-        List of [x, y] coordinates for merged polygon
-    """
-    from shapely.geometry import MultiPolygon
-
-    # Convert MultiPolygons to single polygons via union
-    single_geoms = []
-    for geom in polygons:
-        if isinstance(geom, MultiPolygon):
-            unified = unary_union(geom)
-            if unified.geom_type == 'MultiPolygon':
-                # Take largest component
-                unified = max(unified.geoms, key=lambda p: p.area)
-            single_geoms.append(unified)
-        else:
-            single_geoms.append(geom)
-
-    # Get all coordinate arrays
-    all_coords = [np.array(poly.exterior.coords[:-1]) for poly in single_geoms]
-
-    # Find the polygon with median number of points
-    num_points = [len(coords) for coords in all_coords]
-    target_num_points = int(np.median(num_points))
-
-    # Resample all polygons to have the same number of points
-    resampled_coords = []
-    for coords in all_coords:
-        if len(coords) != target_num_points:
-            # Simple linear interpolation to get target number of points
-            indices = np.linspace(0, len(coords) - 1, target_num_points)
-            indices_int = indices.astype(int)
-            resampled = coords[indices_int]
-        else:
-            resampled = coords
-        resampled_coords.append(resampled)
-
-    # Average the coordinates
-    avg_coords = np.mean(resampled_coords, axis=0)
-
-    return [[float(x), float(y)] for x, y in avg_coords]
-
-
 def merge_polygons(polygons: List, method: str) -> List[List[float]]:
     """
     Merge multiple polygons using specified method.
 
     Args:
         polygons: List of Shapely Polygon or MultiPolygon objects
-        method: 'union', 'average', or 'intersection'
+        method: 'union', or 'intersection'
 
     Returns:
         List of [x, y] coordinates for merged polygon
@@ -296,8 +388,6 @@ def merge_polygons(polygons: List, method: str) -> List[List[float]]:
         return merge_polygons_union(polygons)
     elif method == 'intersection':
         return merge_polygons_intersection(polygons)
-    elif method == 'average':
-        return merge_polygons_average(polygons)
     else:
         raise ValueError(f"Unknown merge method: {method}")
 

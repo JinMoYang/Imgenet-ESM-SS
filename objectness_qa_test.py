@@ -10,7 +10,7 @@ from pathlib import Path
 
 # Configuration
 IMAGE_DIR = "./assets/original"
-MERGED_ANNOTATIONS_DIR = "./merged_results/merged_annotations"
+MERGED_ANNOTATIONS_DIR = "./assets/merged_results/merged_annotations"
 
 def load_merged_annotation(image_name):
     """Load merged annotation JSON for a given image."""

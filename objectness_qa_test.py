@@ -56,7 +56,7 @@ def draw_polygons_on_image(image, annotation_data):
                     text_pos = polygon_points[0]
                     # Try to load a font, fall back to default if not available
                     try:
-                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
                     except:
                         font = ImageFont.load_default()
 

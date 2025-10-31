@@ -8,7 +8,6 @@ performing IoU-based quality checks and label voting.
 
 import argparse
 import json
-import os
 import sys
 from collections import defaultdict, Counter
 from pathlib import Path
@@ -18,6 +17,7 @@ import pandas as pd
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 from datetime import datetime
+from scipy.optimize import linear_sum_assignment
 
 
 def parse_args():
@@ -198,6 +198,79 @@ def merge_polygons(polygons: List[Polygon], method: str) -> List[List[float]]:
         raise ValueError(f"Unknown merge method: {method}")
 
 
+def match_shapes_across_annotators(
+    shapes_lists: List[List[Dict]]
+) -> List[Tuple[int, int, int]]:
+    """
+    Match shapes across 3 annotators using IoU-based Hungarian algorithm.
+
+    Args:
+        shapes_lists: List of 3 shape lists, one from each annotator
+
+    Returns:
+        List of tuples (idx0, idx1, idx2) representing matched shape indices
+    """
+    if len(shapes_lists) != 3:
+        return []
+
+    # Convert all shapes to polygons
+    all_polygons = []
+    for shapes in shapes_lists:
+        polygons = []
+        for shape in shapes:
+            try:
+                poly = polygon_from_points(shape['points'])
+                polygons.append(poly)
+            except:
+                polygons.append(None)
+        all_polygons.append(polygons)
+
+    n0, n1, n2 = len(all_polygons[0]), len(all_polygons[1]), len(all_polygons[2])
+
+    # Step 1: Match annotator 0 with annotator 1
+    if n0 == 0 or n1 == 0:
+        return []
+
+    cost_matrix_01 = np.zeros((n0, n1))
+    for i in range(n0):
+        for j in range(n1):
+            if all_polygons[0][i] is not None and all_polygons[1][j] is not None:
+                iou = calculate_iou(all_polygons[0][i], all_polygons[1][j])
+                cost_matrix_01[i, j] = -iou  # Negative because we want to maximize IoU
+            else:
+                cost_matrix_01[i, j] = 1.0  # High cost for invalid polygons
+
+    row_ind_01, col_ind_01 = linear_sum_assignment(cost_matrix_01)
+
+    # Step 2: For each match from step 1, find best match in annotator 2
+    matches = []
+    for i, j in zip(row_ind_01, col_ind_01):
+        if n2 == 0:
+            continue
+
+        # Find best match in annotator 2
+        best_k = -1
+        best_iou = -1
+
+        for k in range(n2):
+            if all_polygons[2][k] is None:
+                continue
+
+            # Calculate average IoU with both matched polygons
+            iou_0k = calculate_iou(all_polygons[0][i], all_polygons[2][k]) if all_polygons[0][i] else 0
+            iou_1k = calculate_iou(all_polygons[1][j], all_polygons[2][k]) if all_polygons[1][j] else 0
+            avg_iou = (iou_0k + iou_1k) / 2
+
+            if avg_iou > best_iou:
+                best_iou = avg_iou
+                best_k = k
+
+        if best_k >= 0:
+            matches.append((i, j, best_k))
+
+    return matches
+
+
 def load_annotations_by_image(input_dir: str) -> Dict[str, List[Dict]]:
     """
     Load all annotations grouped by image name.
@@ -259,7 +332,7 @@ def process_image_annotations(
     merge_method: str
 ) -> Tuple[Optional[Dict], Dict]:
     """
-    Process annotations for a single image.
+    Process annotations for a single image with multiple objects.
 
     Args:
         image_name: Name of the image
@@ -278,7 +351,8 @@ def process_image_annotations(
         'vote_status': 'clean',
         'annotator_labels': [],
         'min_iou': None,
-        'num_annotators': len(annotations)
+        'num_annotators': len(annotations),
+        'num_objects': 0
     }
 
     # Check if we have exactly 3 annotators
@@ -287,102 +361,138 @@ def process_image_annotations(
         report['vote_status'] = f'wrong_count_{len(annotations)}'
         return None, report
 
-    # Extract shapes and labels from each annotator
+    # Extract shapes from each annotator
     all_shapes = []
-    all_labels = []
-
     for ann in annotations:
         shapes = ann['data'].get('shapes', [])
-        if not shapes:
+        all_shapes.append(shapes)
+
+    # Check if all annotators have shapes
+    shape_counts = [len(shapes) for shapes in all_shapes]
+    if any(count == 0 for count in shape_counts):
+        report['mask_error'] = True
+        report['vote_status'] = 'no_shapes'
+        return None, report
+
+    # Check if all annotators have the same number of objects
+    if len(set(shape_counts)) != 1:
+        report['mask_error'] = True
+        report['vote_status'] = f'count_mismatch_{shape_counts}'
+        return None, report
+
+    num_objects = shape_counts[0]
+    report['num_objects'] = num_objects
+
+    # Match shapes across annotators using IoU
+    matches = match_shapes_across_annotators(all_shapes)
+
+    # Check if we got the expected number of matches
+    if len(matches) != num_objects:
+        report['mask_error'] = True
+        report['vote_status'] = f'matching_failed_{len(matches)}/{num_objects}'
+        return None, report
+
+    # Process each matched object
+    merged_shapes = []
+    all_min_ious = []
+    all_vote_statuses = []
+    all_labels = []
+
+    for match_idx, (idx0, idx1, idx2) in enumerate(matches):
+        # Get the three matched shapes
+        shape0 = all_shapes[0][idx0]
+        shape1 = all_shapes[1][idx1]
+        shape2 = all_shapes[2][idx2]
+
+        matched_shapes = [shape0, shape1, shape2]
+        labels = [s['label'] for s in matched_shapes]
+
+        # Convert to polygons
+        try:
+            polygons = [polygon_from_points(s['points']) for s in matched_shapes]
+        except Exception as e:
             report['mask_error'] = True
-            report['vote_status'] = 'no_shapes'
+            report['vote_status'] = f'invalid_polygon_obj{match_idx}: {e}'
             return None, report
 
-        # For now, assume one shape per image (can be extended)
-        all_shapes.append(shapes)
-        all_labels.append([s['label'] for s in shapes])
+        # Calculate pairwise IoU
+        ious = []
+        for i in range(len(polygons)):
+            for j in range(i + 1, len(polygons)):
+                iou = calculate_iou(polygons[i], polygons[j])
+                ious.append(iou)
 
-    # Process each shape index (assuming corresponding shapes across annotators)
-    # For simplicity, we'll process the first shape from each annotator
-    if not all(len(shapes) > 0 for shapes in all_shapes):
-        report['mask_error'] = True
-        report['vote_status'] = 'missing_shapes'
-        return None, report
+        min_iou = min(ious) if ious else 0.0
+        all_min_ious.append(min_iou)
 
-    # Get the primary shape from each annotator
-    primary_shapes = [shapes[0] for shapes in all_shapes]
-    primary_labels = [s['label'] for s in primary_shapes]
-    report['annotator_labels'] = primary_labels
+        # Check if all IoUs meet threshold
+        if min_iou < iou_threshold:
+            report['mask_error'] = True
+            report['vote_status'] = f'low_iou_obj{match_idx}_{min_iou:.3f}'
+            return None, report
 
-    # Convert to polygons
-    try:
-        polygons = [polygon_from_points(s['points']) for s in primary_shapes]
-    except Exception as e:
-        report['mask_error'] = True
-        report['vote_status'] = f'invalid_polygon: {e}'
-        return None, report
+        # Merge polygons
+        try:
+            merged_points = merge_polygons(polygons, merge_method)
+        except Exception as e:
+            report['mask_error'] = True
+            report['vote_status'] = f'merge_failed_obj{match_idx}: {e}'
+            return None, report
 
-    # Calculate pairwise IoU
-    ious = []
-    for i in range(len(polygons)):
-        for j in range(i + 1, len(polygons)):
-            iou = calculate_iou(polygons[i], polygons[j])
-            ious.append(iou)
+        # Label voting
+        label_counts = Counter(labels)
+        most_common = label_counts.most_common()
 
-    min_iou = min(ious) if ious else 0.0
-    report['min_iou'] = round(min_iou, 3)
+        if len(most_common) == 1:
+            # All labels are the same
+            final_label = most_common[0][0]
+            vote_status = 'unanimous'
+        elif most_common[0][1] > most_common[1][1]:
+            # Clear majority
+            final_label = most_common[0][0]
+            vote_status = 'voted'
+        else:
+            # No majority
+            report['class_error'] = True
+            report['vote_status'] = f'no_majority_obj{match_idx}_{dict(label_counts)}'
+            return None, report
 
-    # Check if all IoUs meet threshold
-    if min_iou < iou_threshold:
-        report['mask_error'] = True
-        report['vote_status'] = f'low_iou_{min_iou:.3f}'
-        return None, report
+        all_vote_statuses.append(vote_status)
+        all_labels.append(final_label)
 
-    # Merge polygons
-    try:
-        merged_points = merge_polygons(polygons, merge_method)
-    except Exception as e:
-        report['mask_error'] = True
-        report['vote_status'] = f'merge_failed: {e}'
-        return None, report
+        # Add merged shape
+        merged_shapes.append({
+            'label': final_label,
+            'points': merged_points,
+            'group_id': None,
+            'shape_type': 'polygon',
+            'flags': {},
+            'description': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}',
+            'score': None,
+            'difficult': False,
+            'attributes': {},
+            'kie_linking': []
+        })
 
-    # Label voting
-    label_counts = Counter(primary_labels)
-    most_common = label_counts.most_common()
+    # Update report with overall statistics
+    report['min_iou'] = round(min(all_min_ious), 3) if all_min_ious else None
+    report['final_label'] = ','.join(all_labels) if all_labels else None
+    report['annotator_labels'] = all_labels
 
-    if len(most_common) == 1:
-        # All labels are the same
-        final_label = most_common[0][0]
+    # Overall vote status
+    if all(vs == 'unanimous' for vs in all_vote_statuses):
         report['vote_status'] = 'unanimous'
-    elif most_common[0][1] > most_common[1][1]:
-        # Clear majority
-        final_label = most_common[0][0]
+    elif any(vs == 'voted' for vs in all_vote_statuses):
         report['vote_status'] = 'voted'
     else:
-        # No majority (e.g., 3 different labels or tie)
-        report['class_error'] = True
-        report['vote_status'] = f'no_majority_{dict(label_counts)}'
-        return None, report
-
-    report['final_label'] = final_label
+        report['vote_status'] = 'clean'
 
     # Create merged annotation in LabelMe format
     base_data = annotations[0]['data'].copy()
     merged_annotation = {
         'version': base_data.get('version', '5.0.0'),
         'flags': {},
-        'shapes': [{
-            'label': final_label,
-            'points': merged_points,
-            'group_id': None,
-            'shape_type': 'polygon',
-            'flags': {},
-            'description': f'Merged from {len(annotations)} annotators using {merge_method}',
-            'score': None,
-            'difficult': False,
-            'attributes': {},
-            'kie_linking': []
-        }],
+        'shapes': merged_shapes,
         'imagePath': image_name,
         'imageData': None,
         'imageHeight': base_data.get('imageHeight'),

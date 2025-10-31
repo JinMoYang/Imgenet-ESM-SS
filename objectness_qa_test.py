@@ -1,14 +1,71 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import os
 import glob
+import json
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from pathlib import Path
 
 # Configuration
-IMAGE_DIR = "./assets/objectness_original"
-IMAGE_DIR_2 = "./assets/objectness_checked"
+IMAGE_DIR = "./assets/original"
+MERGED_ANNOTATIONS_DIR = "./merged_results/merged_annotations"
+
+def load_merged_annotation(image_name):
+    """Load merged annotation JSON for a given image."""
+    json_name = Path(image_name).stem + '.json'
+    json_path = os.path.join(MERGED_ANNOTATIONS_DIR, json_name)
+
+    if not os.path.exists(json_path):
+        return None
+
+    try:
+        with open(json_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        st.error(f"Error loading annotation: {e}")
+        return None
+
+def draw_polygons_on_image(image, annotation_data):
+    """Draw all merged polygons on an image."""
+    # Create a copy to draw on
+    img_copy = image.copy()
+    draw = ImageDraw.Draw(img_copy)
+
+    # Define colors for polygons
+    colors = ['#00FF00', '#FFFF00', '#FF00FF', '#00FFFF', '#FF8C00']
+
+    if annotation_data and 'shapes' in annotation_data:
+        for idx, shape in enumerate(annotation_data['shapes']):
+            if shape['shape_type'] == 'polygon':
+                points = shape['points']
+                label = shape.get('label', 'unknown')
+
+                # Convert points to tuples
+                polygon_points = [tuple(p) for p in points]
+
+                # Choose color
+                color = colors[idx % len(colors)]
+
+                # Draw polygon outline (thick line)
+                draw.polygon(polygon_points, outline=color, width=4)
+
+                # Draw label near the first point
+                if polygon_points:
+                    text_pos = polygon_points[0]
+                    # Try to load a font, fall back to default if not available
+                    try:
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+                    except:
+                        font = ImageFont.load_default()
+
+                    # Draw text background
+                    bbox = draw.textbbox(text_pos, label, font=font)
+                    draw.rectangle(bbox, fill='black')
+                    draw.text(text_pos, label, fill=color, font=font)
+
+    return img_copy
 
 @st.cache_resource
 def get_gsheet_connection():
@@ -119,13 +176,28 @@ def check_if_image_already_reviewed(reviewer_name, image_name):
         return False
 
 def get_image_list():
-    """Get list of all JPEG images in the assets directory"""
-    image_files = glob.glob(os.path.join(IMAGE_DIR, "*.JPEG"))
-    image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.jpeg")))
-    image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.jpg")))
-    image_files.extend(glob.glob(os.path.join(IMAGE_DIR, "*.JPG")))
-    image_files.sort()
-    return [os.path.basename(f) for f in image_files]
+    """Get list of images that have merged annotations (clean merges only)"""
+    # Get all JSON files from merged annotations directory
+    if not os.path.exists(MERGED_ANNOTATIONS_DIR):
+        return []
+
+    json_files = glob.glob(os.path.join(MERGED_ANNOTATIONS_DIR, "*.json"))
+
+    # Extract image names from JSON filenames
+    image_names = []
+    for json_file in json_files:
+        json_basename = os.path.basename(json_file)
+        image_stem = Path(json_basename).stem
+
+        # Look for corresponding image file in IMAGE_DIR
+        for ext in ['.JPEG', '.jpeg', '.jpg', '.JPG', '.png', '.PNG']:
+            image_path = os.path.join(IMAGE_DIR, image_stem + ext)
+            if os.path.exists(image_path):
+                image_names.append(image_stem + ext)
+                break
+
+    image_names.sort()
+    return image_names
 
 # Initialize session state
 if 'current_image_idx' not in st.session_state:
@@ -211,7 +283,7 @@ def save_current_response():
 
 # Page config
 st.set_page_config(
-    page_title="Objectness QA Test",
+    page_title="Merged Annotations Review",
     page_icon="🔍",
     layout="wide"
 )
@@ -254,8 +326,8 @@ st.markdown("""
 if not st.session_state.app_started:
     st.markdown("""
     <div class="main-header">
-        <h1>🔍 Objectness QA Review</h1>
-        <p style="font-size: 18px;">Welcome to the Image Annotation Review System</p>
+        <h1>🔍 Merged Annotations Review</h1>
+        <p style="font-size: 18px;">Review Merged Annotations from Multiple Annotators</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -263,12 +335,12 @@ if not st.session_state.app_started:
 
     st.markdown("""
     ### How to Use This App
-    **Meaning of Stars:**
-    - 🔴 Red stars : Clear COCO object
-    - 🔵 Blue stars : (Ignore this) Clear non-COCO object
-    - 🟡 Yellow stars : (Ignore this) Flagged object
-    - 🟢 Green stars : isCrowd annotations
-    - 🚫 No stars : false negative images
+
+    **About Merged Annotations:**
+    - This app displays images with merged annotations from 3 annotators
+    - Only successfully merged images (no errors) are shown
+    - Polygons are color-coded: Green, Yellow, Magenta, Cyan, Orange
+    - Multiple objects per image are supported
 
     **Navigation:**
     - Use **Previous/Next** buttons to move between images
@@ -338,8 +410,8 @@ if not st.session_state.app_started:
 # Main Review Interface
 st.markdown("""
 <div class="main-header">
-    <h1>🔍 Objectness QA Review</h1>
-    <p style="font-size: 18px;">Review image annotations and provide feedback</p>
+    <h1>🔍 Merged Annotations Review</h1>
+    <p style="font-size: 18px;">Review merged annotations and provide feedback</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -426,33 +498,44 @@ with col5:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Display two versions of images side by side
-st.subheader("📸 Image Comparison")
+# Display original and annotated images side by side
+st.subheader("📸 Image with Merged Annotations")
 col_img1, col_img2 = st.columns([1, 1])
+
+# Load the image
+image_path = os.path.join(IMAGE_DIR, current_image)
+merged_annotation = load_merged_annotation(current_image)
 
 with col_img1:
     st.markdown('<div class="image-container">', unsafe_allow_html=True)
     st.markdown("**Original**")
-    image_path = os.path.join(IMAGE_DIR, current_image)
 
     if os.path.exists(image_path):
         image = Image.open(image_path)
         st.image(image, caption=current_image, use_container_width=True)
     else:
         st.error(f"❌ Image not found: {image_path}")
+        image = None
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_img2:
     st.markdown('<div class="image-container">', unsafe_allow_html=True)
-    st.markdown("**Checked**")
-    image_path_2 = os.path.join(IMAGE_DIR_2, current_image)
+    st.markdown("**With Merged Annotations**")
 
-    if os.path.exists(image_path_2):
-        image_2 = Image.open(image_path_2)
-        st.image(image_2, caption=current_image, use_container_width=True)
+    if image is not None and merged_annotation is not None:
+        # Draw polygons on image
+        annotated_image = draw_polygons_on_image(image, merged_annotation)
+        st.image(annotated_image, caption=f"{current_image} (annotated)", use_container_width=True)
+
+        # Display annotation info
+        num_objects = len(merged_annotation.get('shapes', []))
+        labels = [shape['label'] for shape in merged_annotation.get('shapes', [])]
+        st.info(f"🔍 Objects: {num_objects} | Labels: {', '.join(labels)}")
+    elif merged_annotation is None:
+        st.error(f"❌ Merged annotation not found")
     else:
-        st.warning(f"⚠️ Version 2 not found")
+        st.error(f"❌ Cannot display annotations")
 
     st.markdown('</div>', unsafe_allow_html=True)
 

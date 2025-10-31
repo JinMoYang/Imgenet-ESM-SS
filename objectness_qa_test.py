@@ -339,7 +339,6 @@ if not st.session_state.app_started:
     **About Merged Annotations:**
     - This app displays images with merged annotations from 3 annotators
     - Only successfully merged images (no errors) are shown
-    - Polygons are color-coded: Green, Yellow, Magenta, Cyan, Orange
     - Multiple objects per image are supported
 
     **Navigation:**
@@ -368,7 +367,7 @@ if not st.session_state.app_started:
         st.success(f"✅ Found {total_images} images ready for review")
     else:
         st.error(f"❌ No images found in {IMAGE_DIR} directory!")
-        st.info("Please add JPEG images to the ./assets/ directory before starting.")
+        st.info(f"Please add JPEG images to the {IMAGE_DIR} directory before starting.")
 
     st.markdown("---")
 

@@ -177,27 +177,30 @@ def check_if_image_already_reviewed(reviewer_name, image_name):
 
 def get_image_list():
     """Get list of images that have merged annotations (clean merges only)"""
-    # Get all JSON files from merged annotations directory
+    # Check if directories exist
+    if not os.path.exists(IMAGE_DIR):
+        return []
     if not os.path.exists(MERGED_ANNOTATIONS_DIR):
         return []
 
-    json_files = glob.glob(os.path.join(MERGED_ANNOTATIONS_DIR, "*.json"))
-
-    # Extract image names from JSON filenames
+    # Get all image files from assets directory
     image_names = []
-    for json_file in json_files:
-        json_basename = os.path.basename(json_file)
-        image_stem = Path(json_basename).stem
+    for ext in ['*.JPEG', '*.jpeg', '*.jpg', '*.JPG', '*.png', '*.PNG']:
+        image_files = glob.glob(os.path.join(IMAGE_DIR, ext))
+        image_names.extend([os.path.basename(f) for f in image_files])
 
-        # Look for corresponding image file in IMAGE_DIR
-        for ext in ['.JPEG', '.jpeg', '.jpg', '.JPG', '.png', '.PNG']:
-            image_path = os.path.join(IMAGE_DIR, image_stem + ext)
-            if os.path.exists(image_path):
-                image_names.append(image_stem + ext)
-                break
+    # Filter: only keep images that have corresponding JSON annotations
+    filtered_images = []
+    for image_name in image_names:
+        image_stem = Path(image_name).stem
+        json_path = os.path.join(MERGED_ANNOTATIONS_DIR, image_stem + '.json')
 
-    image_names.sort()
-    return image_names
+        # Only include if JSON annotation exists
+        if os.path.exists(json_path):
+            filtered_images.append(image_name)
+
+    filtered_images.sort()
+    return filtered_images
 
 # Initialize session state
 if 'current_image_idx' not in st.session_state:

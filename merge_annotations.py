@@ -68,13 +68,81 @@ def polygon_from_points(points: List[List[float]]) -> Polygon:
     return Polygon(points)
 
 
-def calculate_iou(poly1: Polygon, poly2: Polygon) -> float:
+def group_shapes_by_group_id(shapes: List[Dict]) -> List[Dict]:
     """
-    Calculate Intersection over Union (IoU) between two polygons.
+    Group shapes by their group_id. Shapes with the same group_id are treated as one object.
 
     Args:
-        poly1: First polygon
-        poly2: Second polygon
+        shapes: List of shape dictionaries from LabelMe format
+
+    Returns:
+        List of grouped shape dictionaries, where each dict represents one object
+        (possibly with multiple polygons if they share a group_id)
+    """
+    from collections import OrderedDict
+
+    # Group shapes by group_id
+    # Use OrderedDict to preserve order
+    grouped = OrderedDict()
+    ungrouped = []
+
+    for shape in shapes:
+        group_id = shape.get('group_id')
+
+        if group_id is None:
+            # No group_id - treat as individual object
+            ungrouped.append({
+                'shapes': [shape],
+                'group_id': None,
+                'label': shape['label']
+            })
+        else:
+            # Has group_id - add to group
+            if group_id not in grouped:
+                grouped[group_id] = {
+                    'shapes': [],
+                    'group_id': group_id,
+                    'label': shape['label']  # Take label from first shape in group
+                }
+            grouped[group_id]['shapes'].append(shape)
+
+    # Combine grouped and ungrouped
+    result = list(grouped.values()) + ungrouped
+    return result
+
+
+def shapes_to_polygon(grouped_shape: Dict):
+    """
+    Convert grouped shape(s) to Shapely Polygon or MultiPolygon.
+
+    Args:
+        grouped_shape: Dict with 'shapes' list (output from group_shapes_by_group_id)
+
+    Returns:
+        Shapely Polygon (if single shape) or MultiPolygon (if multiple shapes)
+    """
+    from shapely.geometry import MultiPolygon
+
+    shapes = grouped_shape['shapes']
+
+    if len(shapes) == 1:
+        # Single shape - return Polygon
+        return polygon_from_points(shapes[0]['points'])
+    else:
+        # Multiple shapes - return MultiPolygon
+        polygons = [polygon_from_points(shape['points']) for shape in shapes]
+        return MultiPolygon(polygons)
+
+
+def calculate_iou(poly1, poly2) -> float:
+    """
+    Calculate Intersection over Union (IoU) between two geometries.
+
+    Works with Polygon, MultiPolygon, or any Shapely geometry.
+
+    Args:
+        poly1: First geometry (Polygon or MultiPolygon)
+        poly2: Second geometry (Polygon or MultiPolygon)
 
     Returns:
         IoU value between 0 and 1
@@ -95,17 +163,27 @@ def calculate_iou(poly1: Polygon, poly2: Polygon) -> float:
         return 0.0
 
 
-def merge_polygons_union(polygons: List[Polygon]) -> List[List[float]]:
+def merge_polygons_union(polygons: List) -> List[List[float]]:
     """
     Merge polygons using union (largest coverage).
 
     Args:
-        polygons: List of Shapely Polygon objects
+        polygons: List of Shapely Polygon or MultiPolygon objects
 
     Returns:
         List of [x, y] coordinates for merged polygon
     """
-    merged = unary_union(polygons)
+    from shapely.geometry import MultiPolygon
+
+    # Flatten any MultiPolygons into individual polygons
+    flattened = []
+    for geom in polygons:
+        if isinstance(geom, MultiPolygon):
+            flattened.extend(geom.geoms)
+        else:
+            flattened.append(geom)
+
+    merged = unary_union(flattened)
 
     # Handle case where union creates MultiPolygon - take the largest
     if merged.geom_type == 'MultiPolygon':
@@ -116,24 +194,35 @@ def merge_polygons_union(polygons: List[Polygon]) -> List[List[float]]:
     return [[float(x), float(y)] for x, y in coords]
 
 
-def merge_polygons_intersection(polygons: List[Polygon]) -> List[List[float]]:
+def merge_polygons_intersection(polygons: List) -> List[List[float]]:
     """
     Merge polygons using intersection (most conservative).
 
     Args:
-        polygons: List of Shapely Polygon objects
+        polygons: List of Shapely Polygon or MultiPolygon objects
 
     Returns:
         List of [x, y] coordinates for merged polygon
     """
-    merged = polygons[0]
-    for poly in polygons[1:]:
+    from shapely.geometry import MultiPolygon
+
+    # Flatten any MultiPolygons into individual polygons, then take union of each group
+    # to get single geometry per annotator
+    single_geoms = []
+    for geom in polygons:
+        if isinstance(geom, MultiPolygon):
+            single_geoms.append(unary_union(geom))
+        else:
+            single_geoms.append(geom)
+
+    merged = single_geoms[0]
+    for poly in single_geoms[1:]:
         merged = merged.intersection(poly)
 
     # Handle case where intersection is empty or creates GeometryCollection
     if merged.is_empty or merged.geom_type not in ['Polygon', 'MultiPolygon']:
         # Fallback to first polygon if intersection fails
-        merged = polygons[0]
+        merged = single_geoms[0]
     elif merged.geom_type == 'MultiPolygon':
         merged = max(merged.geoms, key=lambda p: p.area)
 
@@ -141,19 +230,34 @@ def merge_polygons_intersection(polygons: List[Polygon]) -> List[List[float]]:
     return [[float(x), float(y)] for x, y in coords]
 
 
-def merge_polygons_average(polygons: List[Polygon]) -> List[List[float]]:
+def merge_polygons_average(polygons: List) -> List[List[float]]:
     """
     Merge polygons by averaging coordinates.
     Note: This assumes polygons have similar number of points and shape.
+    For MultiPolygons, takes union first to create a single polygon.
 
     Args:
-        polygons: List of Shapely Polygon objects
+        polygons: List of Shapely Polygon or MultiPolygon objects
 
     Returns:
         List of [x, y] coordinates for merged polygon
     """
+    from shapely.geometry import MultiPolygon
+
+    # Convert MultiPolygons to single polygons via union
+    single_geoms = []
+    for geom in polygons:
+        if isinstance(geom, MultiPolygon):
+            unified = unary_union(geom)
+            if unified.geom_type == 'MultiPolygon':
+                # Take largest component
+                unified = max(unified.geoms, key=lambda p: p.area)
+            single_geoms.append(unified)
+        else:
+            single_geoms.append(geom)
+
     # Get all coordinate arrays
-    all_coords = [np.array(poly.exterior.coords[:-1]) for poly in polygons]
+    all_coords = [np.array(poly.exterior.coords[:-1]) for poly in single_geoms]
 
     # Find the polygon with median number of points
     num_points = [len(coords) for coords in all_coords]
@@ -177,12 +281,12 @@ def merge_polygons_average(polygons: List[Polygon]) -> List[List[float]]:
     return [[float(x), float(y)] for x, y in avg_coords]
 
 
-def merge_polygons(polygons: List[Polygon], method: str) -> List[List[float]]:
+def merge_polygons(polygons: List, method: str) -> List[List[float]]:
     """
     Merge multiple polygons using specified method.
 
     Args:
-        polygons: List of Shapely Polygon objects
+        polygons: List of Shapely Polygon or MultiPolygon objects
         method: 'union', 'average', or 'intersection'
 
     Returns:

@@ -4,7 +4,7 @@ import os
 
 # Image directory
 IMAGE_DIR = "./assets"
-
+ 
 # Quiz Data with Images
 QUESTIONS = [
     {

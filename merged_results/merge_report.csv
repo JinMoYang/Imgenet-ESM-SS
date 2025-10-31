@@ -1,0 +1,3 @@
+image_name,mask_error,class_error,final_label,vote_status,annotator_labels,min_iou,num_annotators
+question_1_image.png,False,False,sports ball,unanimous,"['sports ball', 'sports ball', 'sports ball']",0.998,3
+question_2_image.png,False,False,refrigerator,voted,"['refrigerator', 'refrigerator', 'orange']",0.999,3

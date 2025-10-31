@@ -9,7 +9,7 @@ from google.oauth2.service_account import Credentials
 from pathlib import Path
 
 # Configuration
-IMAGE_DIR = "./assets"
+IMAGE_DIR = "./assets/original"
 MERGED_ANNOTATIONS_DIR = "./merged_results/merged_annotations"
 
 def load_merged_annotation(image_name):

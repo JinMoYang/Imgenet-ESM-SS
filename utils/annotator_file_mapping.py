@@ -6,14 +6,14 @@ import sys
 # --- 1. 설정 (Configuration) ---
 
 # CSV 파일 경로
-CSV_FILE = '/Users/woojin/Documents/AioT/test/sample_images/batch_1st/batch_1st.csv'
+CSV_FILE = '/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st.csv'
 
 # 원본 어노테이션 폴더가 들어있는 기본 폴더
 # e.g., 'batch_1st_result/batch_1st_우진_annotation/...'
-SOURCE_BASE_DIR = Path('/Users/woojin/Documents/AioT/test/sample_images/batch_1st/batch_1st_result')
+SOURCE_BASE_DIR = Path('/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st_result')
 
 # 파일을 옮길 대상 기본 폴더 (현재 폴더를 기준으로)
-DEST_BASE_DIR = Path('/Users/woojin/Documents/AioT/test/sample_images/batch_1st/batch_1st_validation') 
+DEST_BASE_DIR = Path('/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st_validation') 
 
 # CSV에서 읽어올 어노테이터 컬럼 이름과
 # 매칭되는 대상 폴더 이름 (동일하게 설정)

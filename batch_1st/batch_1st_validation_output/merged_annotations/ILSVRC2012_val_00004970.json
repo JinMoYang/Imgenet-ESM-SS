@@ -378,8 +378,8 @@
       "리안"
     ],
     "mergeMethod": "intersection",
-    "iouThreshold": 0.3,
-    "mergeTimestamp": "2025-11-01T15:43:28.001978",
+    "iouThreshold": 0.5,
+    "mergeTimestamp": "2025-11-01T16:14:20.581266",
     "totalObjects": 1,
     "numAnnotators": 2
   }

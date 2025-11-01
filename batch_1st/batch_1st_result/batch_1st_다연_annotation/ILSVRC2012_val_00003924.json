@@ -318,36 +318,6 @@
       "flags": {},
       "attributes": {},
       "kie_linking": []
-    },
-    {
-      "kie_linking": [],
-      "total": true,
-      "label": "",
-      "score": null,
-      "points": [
-        [
-          -Infinity,
-          -Infinity
-        ],
-        [
-          Infinity,
-          -Infinity
-        ],
-        [
-          Infinity,
-          Infinity
-        ],
-        [
-          -Infinity,
-          Infinity
-        ]
-      ],
-      "group_id": null,
-      "description": "",
-      "difficult": false,
-      "shape_type": "rectangle",
-      "flags": {},
-      "attributes": {}
     }
   ],
   "imagePath": "ILSVRC2012_val_00003924.JPEG",

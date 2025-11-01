@@ -930,8 +930,8 @@ if __name__ == '__main__':
 
 """
 python merge_annotations_v3.py \
-    --input-dir /Users/woojin/Documents/AioT/test/sample_images/batch_1st/batch_1st_validation \
-    --output-dir /Users/woojin/Documents/AioT/test/sample_images/batch_1st/batch_1st_validation_output \
+    --input-dir /Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st_validation \
+    --output-dir /Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st_validation_output \
     --iou-threshold 0.5 \
     --merge-method intersection
 """

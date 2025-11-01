@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# merge_annotations_v3.py
+
 """
 Merge annotation JSON files from multiple annotators with quality control.
 

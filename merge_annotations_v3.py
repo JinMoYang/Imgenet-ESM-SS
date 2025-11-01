@@ -2,7 +2,7 @@
 """
 Merge annotation JSON files from multiple annotators with quality control.
 
-This script merges LabelMe-format annotations from 3 annotators per image,
+This script merges LabelMe-format annotations from 2-3 annotators per image,
 performing IoU-based quality checks and label voting.
 
 =============================================================================
@@ -57,14 +57,14 @@ QUALITY CONTROL PROCESS
 =============================================================================
 
 For each image:
-1. Check that exactly 3 annotators provided annotations
+1. Check that 2-3 annotators provided annotations (1 annotator = rejected)
 2. Group shapes by group_id (shapes with same group_id = 1 object)
 3. Verify all annotators marked the same number of objects
 4. Match objects across annotators using IoU-based Hungarian algorithm
 5. For each matched object:
-   - Calculate pairwise IoU between all 3 annotations
+   - Calculate pairwise IoU between all annotations
    - Reject if minimum IoU < threshold (default: 0.5)
-   - Vote on label (unanimous or majority required)
+   - Vote on label (2 annotators: must be unanimous, 3 annotators: majority allowed)
    - Merge polygons using specified method (union/intersection)
 6. Output merged annotation only if all checks pass
 
@@ -116,6 +116,36 @@ def parse_args():
         help='Method to merge polygons: union (largest) or intersection (conservative)'
     )
     return parser.parse_args()
+
+
+def convert_numpy_types(obj):
+    """
+    Recursively convert numpy types to Python native types for JSON serialization.
+    
+    This function handles:
+    - numpy.int64, numpy.int32 → int
+    - numpy.float64, numpy.float32 → float
+    - numpy.ndarray → list
+    - Nested dicts and lists
+    
+    Args:
+        obj: Object to convert (dict, list, numpy type, or primitive)
+    
+    Returns:
+        Object with all numpy types converted to Python native types
+    """
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return convert_numpy_types(obj.tolist())
+    else:
+        return obj
 
 
 def polygon_from_points(points: List[List[float]]) -> Polygon:
@@ -373,6 +403,7 @@ def merge_polygons_intersection(polygons: List) -> List[List[float]]:
     coords = list(merged.exterior.coords[:-1])
     return [[float(x), float(y)] for x, y in coords]
 
+
 def merge_polygons(polygons: List, method: str) -> List[List[float]]:
     """
     Merge multiple polygons using specified method.
@@ -394,17 +425,25 @@ def merge_polygons(polygons: List, method: str) -> List[List[float]]:
 
 def match_shapes_across_annotators(
     grouped_shapes_lists: List[List[Dict]]
-) -> List[Tuple[int, int, int]]:
+) -> List[Tuple]:
     """
-    Match shapes across 3 annotators using IoU-based Hungarian algorithm.
+    Match shapes across 2-3 annotators using IoU-based Hungarian algorithm.
+    
+    Supports both 2 and 3 annotators:
+    - 2 annotators: Direct pairwise matching
+    - 3 annotators: Hungarian algorithm matching
 
     Args:
-        grouped_shapes_lists: List of 3 grouped shape lists (output from group_shapes_by_group_id)
+        grouped_shapes_lists: List of 2-3 grouped shape lists (output from group_shapes_by_group_id)
 
     Returns:
-        List of tuples (idx0, idx1, idx2) representing matched grouped shape indices
+        List of tuples representing matched grouped shape indices
+        - 2 annotators: [(idx0, idx1), ...]
+        - 3 annotators: [(idx0, idx1, idx2), ...]
     """
-    if len(grouped_shapes_lists) != 3:
+    num_annotators = len(grouped_shapes_lists)
+    
+    if num_annotators not in [2, 3]:
         return []
 
     # Convert all grouped shapes to polygons/multipolygons
@@ -419,55 +458,76 @@ def match_shapes_across_annotators(
                 polygons.append(None)
         all_polygons.append(polygons)
 
-    n0, n1, n2 = len(all_polygons[0]), len(all_polygons[1]), len(all_polygons[2])
+    if num_annotators == 2:
+        # 2 annotators: Simple pairwise matching
+        n0, n1 = len(all_polygons[0]), len(all_polygons[1])
+        
+        if n0 == 0 or n1 == 0:
+            return []
+        
+        cost_matrix = np.zeros((n0, n1))
+        for i in range(n0):
+            for j in range(n1):
+                if all_polygons[0][i] is not None and all_polygons[1][j] is not None:
+                    iou = calculate_iou(all_polygons[0][i], all_polygons[1][j])
+                    cost_matrix[i, j] = -iou
+                else:
+                    cost_matrix[i, j] = 1.0
+        
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+        matches = [(i, j) for i, j in zip(row_ind, col_ind)]
+        return matches
+    
+    else:  # num_annotators == 3
+        # 3 annotators: Original logic
+        n0, n1, n2 = len(all_polygons[0]), len(all_polygons[1]), len(all_polygons[2])
 
-    # Step 1: Match annotator 0 with annotator 1
-    if n0 == 0 or n1 == 0:
-        return []
+        if n0 == 0 or n1 == 0:
+            return []
 
-    cost_matrix_01 = np.zeros((n0, n1))
-    for i in range(n0):
-        for j in range(n1):
-            if all_polygons[0][i] is not None and all_polygons[1][j] is not None:
-                iou = calculate_iou(all_polygons[0][i], all_polygons[1][j])
-                cost_matrix_01[i, j] = -iou  # Negative because we want to maximize IoU
-            else:
-                cost_matrix_01[i, j] = 1.0  # High cost for invalid polygons
+        cost_matrix_01 = np.zeros((n0, n1))
+        for i in range(n0):
+            for j in range(n1):
+                if all_polygons[0][i] is not None and all_polygons[1][j] is not None:
+                    iou = calculate_iou(all_polygons[0][i], all_polygons[1][j])
+                    cost_matrix_01[i, j] = -iou
+                else:
+                    cost_matrix_01[i, j] = 1.0
 
-    row_ind_01, col_ind_01 = linear_sum_assignment(cost_matrix_01)
+        row_ind_01, col_ind_01 = linear_sum_assignment(cost_matrix_01)
 
-    # Step 2: For each match from step 1, find best match in annotator 2
-    matches = []
-    for i, j in zip(row_ind_01, col_ind_01):
-        if n2 == 0:
-            continue
-
-        # Find best match in annotator 2
-        best_k = -1
-        best_iou = -1
-
-        for k in range(n2):
-            if all_polygons[2][k] is None:
+        matches = []
+        for i, j in zip(row_ind_01, col_ind_01):
+            if n2 == 0:
                 continue
 
-            # Calculate average IoU with both matched polygons
-            iou_0k = calculate_iou(all_polygons[0][i], all_polygons[2][k]) if all_polygons[0][i] else 0
-            iou_1k = calculate_iou(all_polygons[1][j], all_polygons[2][k]) if all_polygons[1][j] else 0
-            avg_iou = (iou_0k + iou_1k) / 2
+            best_k = -1
+            best_iou = -1
 
-            if avg_iou > best_iou:
-                best_iou = avg_iou
-                best_k = k
+            for k in range(n2):
+                if all_polygons[2][k] is None:
+                    continue
 
-        if best_k >= 0:
-            matches.append((i, j, best_k))
+                iou_0k = calculate_iou(all_polygons[0][i], all_polygons[2][k]) if all_polygons[0][i] else 0
+                iou_1k = calculate_iou(all_polygons[1][j], all_polygons[2][k]) if all_polygons[1][j] else 0
+                avg_iou = (iou_0k + iou_1k) / 2
 
-    return matches
+                if avg_iou > best_iou:
+                    best_iou = avg_iou
+                    best_k = k
+
+            if best_k >= 0:
+                matches.append((i, j, best_k))
+
+        return matches
 
 
 def load_annotations_by_image(input_dir: str) -> Dict[str, List[Dict]]:
     """
     Load all annotations grouped by image name.
+    
+    Extracts annotator name from JSON 'annotator' field if present,
+    otherwise falls back to directory name.
 
     Args:
         input_dir: Directory containing annotator subdirectories
@@ -501,12 +561,15 @@ def load_annotations_by_image(input_dir: str) -> Dict[str, List[Dict]]:
 
         for json_file in json_files:
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+
+                # Extract annotator name from JSON if present, otherwise use folder name
+                annotator_name = data.get('annotator', annotator_dir.name)
 
                 image_name = data.get('imagePath', json_file.stem)
                 annotations_by_image[image_name].append({
-                    'annotator': annotator_dir.name,
+                    'annotator': annotator_name,
                     'data': data,
                     'file': str(json_file)
                 })
@@ -527,6 +590,10 @@ def process_image_annotations(
 ) -> Tuple[Optional[Dict], Dict]:
     """
     Process annotations for a single image with multiple objects.
+    
+    Supports 2-3 annotators:
+    - 2 annotators: Labels must be unanimous
+    - 3 annotators: Majority voting allowed
 
     Args:
         image_name: Name of the image
@@ -546,14 +613,21 @@ def process_image_annotations(
         'annotator_labels': [],
         'min_iou': None,
         'num_annotators': len(annotations),
-        'num_objects': 0
+        'num_objects': 0,
+        'annotators': []
     }
 
-    # Check if we have exactly 3 annotators
-    if len(annotations) != 3:
+    # Check if we have 2 or 3 annotators (reject 1 or 4+)
+    if len(annotations) not in [2, 3]:
         report['mask_error'] = True
         report['vote_status'] = f'wrong_count_{len(annotations)}'
         return None, report
+
+    num_annotators = len(annotations)
+
+    # Extract annotator names
+    annotator_names = [ann['annotator'] for ann in annotations]
+    report['annotators'] = annotator_names
 
     # Extract shapes from each annotator and group by group_id
     all_grouped_shapes = []
@@ -593,13 +667,9 @@ def process_image_annotations(
     all_vote_statuses = []
     all_labels = []
 
-    for match_idx, (idx0, idx1, idx2) in enumerate(matches):
-        # Get the three matched grouped shapes
-        grouped0 = all_grouped_shapes[0][idx0]
-        grouped1 = all_grouped_shapes[1][idx1]
-        grouped2 = all_grouped_shapes[2][idx2]
-
-        matched_grouped = [grouped0, grouped1, grouped2]
+    for match_idx, match_indices in enumerate(matches):
+        # Get the matched grouped shapes
+        matched_grouped = [all_grouped_shapes[i][idx] for i, idx in enumerate(match_indices)]
         labels = [g['label'] for g in matched_grouped]
         group_ids = [g['group_id'] for g in matched_grouped]
 
@@ -639,26 +709,48 @@ def process_image_annotations(
         label_counts = Counter(labels)
         most_common = label_counts.most_common()
 
-        if len(most_common) == 1:
-            # All labels are the same
-            final_label = most_common[0][0]
-            vote_status = 'unanimous'
-        elif most_common[0][1] > most_common[1][1]:
-            # Clear majority
-            final_label = most_common[0][0]
-            vote_status = 'voted'
-        else:
-            # No majority
-            report['class_error'] = True
-            report['vote_status'] = f'no_majority_obj{match_idx}_{dict(label_counts)}'
-            return None, report
+        if num_annotators == 2:
+            # 2 annotators: Must be unanimous
+            if len(most_common) == 1:
+                final_label = most_common[0][0]
+                vote_status = 'unanimous'
+            else:
+                # Labels don't match
+                report['class_error'] = True
+                report['vote_status'] = f'label_mismatch_obj{match_idx}_{dict(label_counts)}'
+                return None, report
+        else:  # num_annotators == 3
+            # 3 annotators: Unanimous or majority
+            if len(most_common) == 1:
+                final_label = most_common[0][0]
+                vote_status = 'unanimous'
+            elif most_common[0][1] > most_common[1][1]:
+                final_label = most_common[0][0]
+                vote_status = 'voted'
+            else:
+                # No majority
+                report['class_error'] = True
+                report['vote_status'] = f'no_majority_obj{match_idx}_{dict(label_counts)}'
+                return None, report
 
         all_vote_statuses.append(vote_status)
         all_labels.append(final_label)
 
+        # Preserve original description from first annotator
+        original_description = ''
+        if matched_grouped[0]['shapes']:
+            original_description = matched_grouped[0]['shapes'][0].get('description', '')
+
+        # Build annotator details for this object
+        annotator_details = []
+        for i, idx in enumerate(match_indices):
+            annotator_details.append({
+                'name': annotator_names[i],
+                'label': labels[i],
+                'object_index': idx
+            })
+
         # Add merged shape
-        # Note: Output is always a single polygon even if inputs had multiple parts (group_id)
-        # because merge functions combine all parts into one
         group_id_info = ""
         if any(gid is not None for gid in group_ids):
             group_id_info = f" (from grouped shapes: {group_ids})"
@@ -669,15 +761,22 @@ def process_image_annotations(
             'group_id': None,
             'shape_type': 'polygon',
             'flags': {},
-            'description': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}{group_id_info}',
+            'description': original_description,
             'score': None,
             'difficult': False,
-            'attributes': {},
+            'attributes': {
+                'annotators': annotator_names,
+                'annotator_labels': labels,
+                'annotator_details': annotator_details,
+                'min_iou': float(round(min_iou, 3)),
+                'vote_status': vote_status,
+                'merge_info': f'Merged obj {match_idx+1} from {num_annotators} annotators using {merge_method}{group_id_info}'
+            },
             'kie_linking': []
         })
 
     # Update report with overall statistics
-    report['min_iou'] = round(min(all_min_ious), 3) if all_min_ious else None
+    report['min_iou'] = float(round(min(all_min_ious), 3)) if all_min_ious else None
     report['final_label'] = ','.join(all_labels) if all_labels else None
     report['annotator_labels'] = all_labels
 
@@ -691,14 +790,27 @@ def process_image_annotations(
 
     # Create merged annotation in LabelMe format
     base_data = annotations[0]['data'].copy()
+    
+    # Explicit type conversions for all numeric fields
+    image_height = base_data.get('imageHeight')
+    image_width = base_data.get('imageWidth')
+    
     merged_annotation = {
         'version': base_data.get('version', '5.0.0'),
         'flags': {},
         'shapes': merged_shapes,
         'imagePath': image_name,
         'imageData': None,
-        'imageHeight': base_data.get('imageHeight'),
-        'imageWidth': base_data.get('imageWidth')
+        'imageHeight': int(image_height) if image_height is not None else None,
+        'imageWidth': int(image_width) if image_width is not None else None,
+        'mergeMetadata': {
+            'annotators': annotator_names,
+            'mergeMethod': merge_method,
+            'iouThreshold': float(iou_threshold),
+            'mergeTimestamp': datetime.now().isoformat(),
+            'totalObjects': int(len(merged_shapes)),
+            'numAnnotators': int(num_annotators)
+        }
     }
 
     return merged_annotation, report
@@ -709,13 +821,16 @@ def main():
     args = parse_args()
 
     print("=" * 80)
-    print("Annotation Merger")
+    print("Annotation Merger (2-3 Annotators)")
     print("=" * 80)
     print(f"\nConfiguration:")
     print(f"  Input directory:  {args.input_dir}")
     print(f"  Output directory: {args.output_dir}")
     print(f"  IoU threshold:    {args.iou_threshold}")
     print(f"  Merge method:     {args.merge_method}")
+    print(f"\nAnnotator requirements:")
+    print(f"  Minimum: 2 annotators (labels must be unanimous)")
+    print(f"  Maximum: 3 annotators (majority voting allowed)")
 
     # Create output directory
     output_path = Path(args.output_dir)
@@ -747,14 +862,9 @@ def main():
 
         # Progress indicator
         status = "✓" if merged is not None else "✗"
-        print(f"  {status} {image_name}: {report['vote_status']}")
+        print(f"  {status} {image_name}: {report['vote_status']} (annotators: {report['num_annotators']})")
 
     # Save merged annotations
-    output_json = output_path / 'merged_annotations.json'
-
-    # For LabelMe format, we need to save each image as a separate file
-    # Or we can save all in a list
-    # Let's create a directory for individual files
     merged_dir = output_path / 'merged_annotations'
     merged_dir.mkdir(exist_ok=True)
 
@@ -764,15 +874,23 @@ def main():
         base_name = Path(image_name).stem + '.json'
         output_file = merged_dir / base_name
 
-        with open(output_file, 'w') as f:
-            json.dump(merged, f, indent=2)
+        # Convert numpy types before JSON serialization
+        merged_clean = convert_numpy_types(merged)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(merged_clean, f, indent=2, ensure_ascii=False)
 
     print(f"\n✓ Saved {len(merged_annotations)} merged annotations to {merged_dir}/")
 
     # Save report CSV
     df = pd.DataFrame(reports)
+    
+    # Convert annotators list to comma-separated string for CSV
+    if 'annotators' in df.columns:
+        df['annotators'] = df['annotators'].apply(lambda x: ','.join(x) if isinstance(x, list) else '')
+    
     csv_path = output_path / 'merge_report.csv'
-    df.to_csv(csv_path, index=False)
+    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
     print(f"✓ Saved report to {csv_path}")
 
     # Print summary statistics
@@ -781,6 +899,13 @@ def main():
     print("=" * 80)
     print(f"  Total images:           {len(reports)}")
     print(f"  Successfully merged:    {len(merged_annotations)}")
+    
+    # Breakdown by number of annotators
+    two_annotator_success = sum(1 for r in reports if not r['mask_error'] and not r['class_error'] and r['num_annotators'] == 2)
+    three_annotator_success = sum(1 for r in reports if not r['mask_error'] and not r['class_error'] and r['num_annotators'] == 3)
+    print(f"    - 2 annotators:       {two_annotator_success}")
+    print(f"    - 3 annotators:       {three_annotator_success}")
+    
     print(f"  Mask errors:            {sum(r['mask_error'] for r in reports)}")
     print(f"  Class errors:           {sum(r['class_error'] for r in reports)}")
     print(f"  Voted (not unanimous):  {sum(r['vote_status'] == 'voted' for r in reports)}")
@@ -802,10 +927,11 @@ def main():
 if __name__ == '__main__':
     main()
 
+
 """
-python merge_annotations.py \
+python merge_annotations_v3.py \
     --input-dir /Users/woojin/Documents/AioT/test/sample_images/batch_test \
     --output-dir /Users/woojin/Documents/AioT/test/sample_images/batch_test/output \
     --iou-threshold 0.5 \
     --merge-method intersection
-    """
+"""

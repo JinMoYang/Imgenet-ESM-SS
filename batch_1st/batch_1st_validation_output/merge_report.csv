@@ -1,20 +1,20 @@
-﻿image_name,mask_error,class_error,final_label,vote_status,annotator_labels,min_iou,num_annotators,num_objects,annotators,excluded_annotators,excluded_counts
-ILSVRC2012_val_00004348.JPEG,True,False,,low_iou_obj0_0.000,[],,2,2,"우진,은수",,
-ILSVRC2012_val_00005821.JPEG,False,False,person,unanimous,['person'],0.991,2,1,"홍준,리안",,
-ILSVRC2012_val_00002331.JPEG,False,False,person,partial_2of3,['person'],0.981,2,1,"리안,홍준",은수,2
-ILSVRC2012_val_00005362.JPEG,False,False,cat,unanimous,['cat'],0.994,2,1,"은수,홍준",,
-ILSVRC2012_val_00002346.JPEG,False,False,bus,unanimous,['bus'],0.995,3,1,"은수,리안,홍준",,
-ILSVRC2012_val_00002669.JPEG,False,False,cow,unanimous,['cow'],0.986,2,1,"은수,다연",,
-ILSVRC2012_val_00000858.JPEG,True,False,,"count_no_match_[3, 2]",[],,2,0,"우진,리안",,
-ILSVRC2012_val_00005177.JPEG,True,False,,"count_no_match_[43, 10]",[],,2,0,"우진,다연",,
-ILSVRC2012_val_00004290.JPEG,False,False,"person,car",unanimous,"['person', 'car']",0.92,3,2,"홍준,다연,리안",,
-ILSVRC2012_val_00005880.JPEG,False,False,person,unanimous,['person'],0.985,2,1,"리안,다연",,
-ILSVRC2012_val_00004970.JPEG,False,False,car,unanimous,['car'],0.996,2,1,"우진,리안",,
-ILSVRC2012_val_00003011.JPEG,True,False,,low_iou_obj0_0.000,[],,3,2,"은수,다연,리안",,
-ILSVRC2012_val_00000871.JPEG,False,False,bear,unanimous,['bear'],0.98,3,1,"우진,리안,은수",,
-ILSVRC2012_val_00003924.JPEG,False,False,car,unanimous,['car'],0.953,3,1,"은수,다연,리안",,
-ILSVRC2012_val_00005701.JPEG,True,False,,low_iou_obj0_0.000,[],,2,1,"은수,다연",,
-ILSVRC2012_val_00005853.JPEG,True,False,,"count_no_match_[4, 2]",[],,2,0,"홍준,다연",,
-ILSVRC2012_val_00003986.JPEG,True,False,,wrong_count_1,[],,1,0,,,
-ILSVRC2012_val_00001528.JPEG,True,False,,wrong_count_1,[],,1,0,,,
-ILSVRC2012_val_00004389.JPEG,True,False,,wrong_count_1,[],,1,0,,,
+﻿image_name,mask_error,class_error,final_label,vote_status,num_annotators,num_clusters,num_objects_per_annotator,annotators,rejected_clusters,num_shapes
+ILSVRC2012_val_00004348.JPEG,False,False,person,unanimous,2,1,"2,2","우진,은수",2,1.0
+ILSVRC2012_val_00005821.JPEG,False,False,person,unanimous,2,1,"1,1","홍준,리안",0,1.0
+ILSVRC2012_val_00002331.JPEG,False,False,person,unanimous,3,1,"2,1,1","은수,리안,홍준",1,1.0
+ILSVRC2012_val_00005362.JPEG,False,False,cat,unanimous,2,1,"1,1","은수,홍준",0,1.0
+ILSVRC2012_val_00002346.JPEG,False,False,bus,unanimous,3,1,"1,1,1","은수,리안,홍준",0,1.0
+ILSVRC2012_val_00002669.JPEG,False,False,cow,unanimous,2,1,"1,1","은수,다연",0,1.0
+ILSVRC2012_val_00000858.JPEG,True,False,,no_valid_clusters,2,0,"3,2","우진,리안",3,0.0
+ILSVRC2012_val_00005177.JPEG,True,False,,no_valid_clusters,2,0,"43,10","우진,다연",53,0.0
+ILSVRC2012_val_00004290.JPEG,False,False,"person,car",unanimous,3,2,"2,2,2","홍준,다연,리안",0,2.0
+ILSVRC2012_val_00005880.JPEG,False,False,person,unanimous,2,1,"1,1","리안,다연",0,1.0
+ILSVRC2012_val_00004970.JPEG,False,False,car,unanimous,2,1,"1,1","우진,리안",0,1.0
+ILSVRC2012_val_00003011.JPEG,False,False,bird,unanimous,3,1,"2,2,2","은수,다연,리안",4,1.0
+ILSVRC2012_val_00000871.JPEG,False,False,bear,unanimous,3,1,"1,1,1","우진,리안,은수",0,1.0
+ILSVRC2012_val_00003924.JPEG,False,False,car,unanimous,3,1,"1,1,1","은수,다연,리안",0,1.0
+ILSVRC2012_val_00005701.JPEG,True,False,,no_valid_clusters,2,0,"1,1","은수,다연",2,0.0
+ILSVRC2012_val_00005853.JPEG,False,False,"bottle,bed",unanimous,2,2,"4,2","홍준,다연",2,2.0
+ILSVRC2012_val_00003986.JPEG,True,False,,wrong_count_1,1,0,,,0,
+ILSVRC2012_val_00001528.JPEG,True,False,,wrong_count_1,1,0,,,0,
+ILSVRC2012_val_00004389.JPEG,True,False,,wrong_count_1,1,0,,,0,

@@ -429,15 +429,21 @@
           "cat",
           "cat"
         ],
+        "annotator_descriptions": [
+          "",
+          ""
+        ],
         "annotator_details": [
           {
             "name": "은수",
             "label": "cat",
+            "description": "",
             "object_index": 0
           },
           {
             "name": "홍준",
             "label": "cat",
+            "description": "",
             "object_index": 0
           }
         ],
@@ -461,7 +467,7 @@
     "excludedCounts": [],
     "mergeMethod": "intersection",
     "iouThreshold": 0.5,
-    "mergeTimestamp": "2025-11-01T17:29:58.330221",
+    "mergeTimestamp": "2025-11-01T17:53:22.651587",
     "totalObjects": 1,
     "numAnnotators": 2
   }

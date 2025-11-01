@@ -529,15 +529,21 @@
           "person",
           "person"
         ],
+        "annotator_descriptions": [
+          "",
+          ""
+        ],
         "annotator_details": [
           {
             "name": "리안",
             "label": "person",
+            "description": "",
             "object_index": 0
           },
           {
             "name": "홍준",
             "label": "person",
+            "description": "",
             "object_index": 0
           }
         ],
@@ -565,7 +571,7 @@
     ],
     "mergeMethod": "intersection",
     "iouThreshold": 0.5,
-    "mergeTimestamp": "2025-11-01T17:29:58.329267",
+    "mergeTimestamp": "2025-11-01T17:53:22.650683",
     "totalObjects": 1,
     "numAnnotators": 2
   }

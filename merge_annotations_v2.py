@@ -118,6 +118,36 @@ def parse_args():
     return parser.parse_args()
 
 
+def convert_numpy_types(obj):
+    """
+    Recursively convert numpy types to Python native types for JSON serialization.
+    
+    This function handles:
+    - numpy.int64, numpy.int32 → int
+    - numpy.float64, numpy.float32 → float
+    - numpy.ndarray → list
+    - Nested dicts and lists
+    
+    Args:
+        obj: Object to convert (dict, list, numpy type, or primitive)
+    
+    Returns:
+        Object with all numpy types converted to Python native types
+    """
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return convert_numpy_types(obj.tolist())
+    else:
+        return obj
+
+
 def polygon_from_points(points: List[List[float]]) -> Polygon:
     """
     Convert list of points to Shapely Polygon.
@@ -373,6 +403,7 @@ def merge_polygons_intersection(polygons: List) -> List[List[float]]:
     coords = list(merged.exterior.coords[:-1])
     return [[float(x), float(y)] for x, y in coords]
 
+
 def merge_polygons(polygons: List, method: str) -> List[List[float]]:
     """
     Merge multiple polygons using specified method.
@@ -468,6 +499,9 @@ def match_shapes_across_annotators(
 def load_annotations_by_image(input_dir: str) -> Dict[str, List[Dict]]:
     """
     Load all annotations grouped by image name.
+    
+    Extracts annotator name from JSON 'annotator' field if present,
+    otherwise falls back to directory name.
 
     Args:
         input_dir: Directory containing annotator subdirectories
@@ -501,12 +535,15 @@ def load_annotations_by_image(input_dir: str) -> Dict[str, List[Dict]]:
 
         for json_file in json_files:
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+
+                # Extract annotator name from JSON if present, otherwise use folder name
+                annotator_name = data.get('annotator', annotator_dir.name)
 
                 image_name = data.get('imagePath', json_file.stem)
                 annotations_by_image[image_name].append({
-                    'annotator': annotator_dir.name,
+                    'annotator': annotator_name,  # Use JSON field or fallback to folder name
                     'data': data,
                     'file': str(json_file)
                 })
@@ -546,7 +583,8 @@ def process_image_annotations(
         'annotator_labels': [],
         'min_iou': None,
         'num_annotators': len(annotations),
-        'num_objects': 0
+        'num_objects': 0,
+        'annotators': []  # Added: list of annotator names
     }
 
     # Check if we have exactly 3 annotators
@@ -554,6 +592,10 @@ def process_image_annotations(
         report['mask_error'] = True
         report['vote_status'] = f'wrong_count_{len(annotations)}'
         return None, report
+
+    # Extract annotator names
+    annotator_names = [ann['annotator'] for ann in annotations]
+    report['annotators'] = annotator_names
 
     # Extract shapes from each annotator and group by group_id
     all_grouped_shapes = []
@@ -656,6 +698,20 @@ def process_image_annotations(
         all_vote_statuses.append(vote_status)
         all_labels.append(final_label)
 
+        # Preserve original description from first annotator
+        original_description = ''
+        if matched_grouped[0]['shapes']:
+            original_description = matched_grouped[0]['shapes'][0].get('description', '')
+
+        # Build annotator details for this object
+        annotator_details = []
+        for i in range(3):
+            annotator_details.append({
+                'name': annotator_names[i],
+                'label': labels[i],
+                'object_index': [idx0, idx1, idx2][i]
+            })
+
         # Add merged shape
         # Note: Output is always a single polygon even if inputs had multiple parts (group_id)
         # because merge functions combine all parts into one
@@ -669,15 +725,22 @@ def process_image_annotations(
             'group_id': None,
             'shape_type': 'polygon',
             'flags': {},
-            'description': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}{group_id_info}',
+            'description': original_description,  # Preserve original description
             'score': None,
             'difficult': False,
-            'attributes': {},
+            'attributes': {
+                'annotators': annotator_names,
+                'annotator_labels': labels,
+                'annotator_details': annotator_details,
+                'min_iou': float(round(min_iou, 3)),  # Explicit float conversion
+                'vote_status': vote_status,
+                'merge_info': f'Merged obj {match_idx+1} from 3 annotators using {merge_method}{group_id_info}'
+            },
             'kie_linking': []
         })
 
     # Update report with overall statistics
-    report['min_iou'] = round(min(all_min_ious), 3) if all_min_ious else None
+    report['min_iou'] = float(round(min(all_min_ious), 3)) if all_min_ious else None
     report['final_label'] = ','.join(all_labels) if all_labels else None
     report['annotator_labels'] = all_labels
 
@@ -691,14 +754,26 @@ def process_image_annotations(
 
     # Create merged annotation in LabelMe format
     base_data = annotations[0]['data'].copy()
+    
+    # Explicit type conversions for all numeric fields
+    image_height = base_data.get('imageHeight')
+    image_width = base_data.get('imageWidth')
+    
     merged_annotation = {
         'version': base_data.get('version', '5.0.0'),
         'flags': {},
         'shapes': merged_shapes,
         'imagePath': image_name,
         'imageData': None,
-        'imageHeight': base_data.get('imageHeight'),
-        'imageWidth': base_data.get('imageWidth')
+        'imageHeight': int(image_height) if image_height is not None else None,
+        'imageWidth': int(image_width) if image_width is not None else None,
+        'mergeMetadata': {
+            'annotators': annotator_names,
+            'mergeMethod': merge_method,
+            'iouThreshold': float(iou_threshold),  # Explicit float conversion
+            'mergeTimestamp': datetime.now().isoformat(),
+            'totalObjects': int(len(merged_shapes))  # Explicit int conversion
+        }
     }
 
     return merged_annotation, report
@@ -750,11 +825,6 @@ def main():
         print(f"  {status} {image_name}: {report['vote_status']}")
 
     # Save merged annotations
-    output_json = output_path / 'merged_annotations.json'
-
-    # For LabelMe format, we need to save each image as a separate file
-    # Or we can save all in a list
-    # Let's create a directory for individual files
     merged_dir = output_path / 'merged_annotations'
     merged_dir.mkdir(exist_ok=True)
 
@@ -764,15 +834,23 @@ def main():
         base_name = Path(image_name).stem + '.json'
         output_file = merged_dir / base_name
 
-        with open(output_file, 'w') as f:
-            json.dump(merged, f, indent=2)
+        # Convert numpy types before JSON serialization
+        merged_clean = convert_numpy_types(merged)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(merged_clean, f, indent=2, ensure_ascii=False)
 
     print(f"\n✓ Saved {len(merged_annotations)} merged annotations to {merged_dir}/")
 
     # Save report CSV
     df = pd.DataFrame(reports)
+    
+    # Convert annotators list to comma-separated string for CSV
+    if 'annotators' in df.columns:
+        df['annotators'] = df['annotators'].apply(lambda x: ','.join(x) if isinstance(x, list) else '')
+    
     csv_path = output_path / 'merge_report.csv'
-    df.to_csv(csv_path, index=False)
+    df.to_csv(csv_path, index=False, encoding='utf-8-sig')  # utf-8-sig for Excel compatibility
     print(f"✓ Saved report to {csv_path}")
 
     # Print summary statistics
@@ -802,10 +880,11 @@ def main():
 if __name__ == '__main__':
     main()
 
+
 """
-python merge_annotations.py \
+python merge_annotations_v2.py \
     --input-dir /Users/woojin/Documents/AioT/test/sample_images/batch_test \
     --output-dir /Users/woojin/Documents/AioT/test/sample_images/batch_test/output \
     --iou-threshold 0.5 \
     --merge-method intersection
-    """
+"""

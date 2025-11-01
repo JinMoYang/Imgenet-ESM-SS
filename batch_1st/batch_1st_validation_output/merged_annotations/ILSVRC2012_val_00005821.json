@@ -581,9 +581,11 @@
       "홍준",
       "리안"
     ],
+    "excludedAnnotators": [],
+    "excludedCounts": [],
     "mergeMethod": "intersection",
     "iouThreshold": 0.5,
-    "mergeTimestamp": "2025-11-01T16:14:20.569313",
+    "mergeTimestamp": "2025-11-01T17:29:58.327787",
     "totalObjects": 1,
     "numAnnotators": 2
   }

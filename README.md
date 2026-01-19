@@ -5,6 +5,7 @@
 - [Protocol](#protocol)
   - [Phase 1](#phase-1-배포)
   - [Phase 2](#phase-2-배포-준비)
+  - [시각화 프로세스](#시각화-프로세스)
 - [Feedback 정합과정](#feedback-정합과정)
 - [최종 피드백 반영](#최종-피드백-반영)
 - [File Structure](#file-structure)
@@ -91,7 +92,7 @@ ILSVRC2012_val_00024165.JPEG,우진,은수,리안,홍준,다연,
 
 ---
 
-### 📊 시각화 프로세스
+### 시각화 프로세스
 
 1. **이미지 매칭**
    - **스크립트**: `match_json_images.py`
@@ -194,11 +195,3 @@ image_name, annotators(띄어쓰기로 구분)
    ```csv
    ImageID, annotator1, annotator2, annotator3, Reviewer1, Reviewer2, Reviewer3
    ```
-
----
-
-## 📌 참고사항
-
-- 모든 스크립트는 프로젝트 루트 또는 `utils/` 폴더에서 실행
-- CSV 파일 인코딩은 UTF-8 사용 권장
-- 구글 드라이브 Apps Script 설정 필요

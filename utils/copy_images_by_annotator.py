@@ -42,4 +42,4 @@ def copy_images_by_annotator(csv_path, source_dir, output_prefix):
         print(f"{name}: {len(images)}개 이미지 복사 완료 -> {output_dir}")
 
 if __name__ == '__main__':
-    copy_images_by_annotator('batch_1st.csv', 'sampled_images', 'batch_1st')
+    copy_images_by_annotator('/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_outer/batch_test/batch_test_anno.csv', '/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_outer/2_test_200/sampled_images', '/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_outer/batch_test/batch_test_question')

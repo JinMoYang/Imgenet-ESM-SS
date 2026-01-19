@@ -131,4 +131,4 @@ def add_annotator_to_json(folder='.'):
 
 if __name__ == '__main__':
     # add_annotator_to_json()  # 현재 디렉토리
-    add_annotator_to_json('/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_1st/batch_1st_result')  # 특정 폴더 지정
+    add_annotator_to_json('/Users/woojin/Documents/AioT/test/sample_images/Imgenet-ESM-SS/batch_inner/batch_3rd/batch_3rd_phase2_result')  # 특정 폴더 지정

@@ -1,0 +1,3 @@
+# 배치 폴더 제외
+batch_inner/
+batch_outer/

@@ -15,36 +15,42 @@ QUESTIONS = [
         "id": 1,
         "image": "tag_q1.JPEG",
         "hint": "Look at the image carefully and determine which object needs an additional tag.",
-        "answer_object": "cat",         
-        "answer_tag": "isreflected",   
+        "answers": [
+            {"object": "cow", "tag": "iscrowd"},
+        ],
     },
     {
         "id": 2,
         "image": "tag_q2.JPEG",
         "hint": "Look at the image carefully and determine which object needs an additional tag.",
-        "answer_object": "stop sign",
-        "answer_tag": "isthrough",
+        "answers": [
+            {"object": "stop sign", "tag": "isthrough"},
+        ],
     },
     {
         "id": 3,
         "image": "tag_q3.JPEG",
         "hint": "Look at the image carefully and determine which object needs an additional tag.",
-        "answer_object": "person",
-        "answer_tag": "isdepicted",
+        "answers": [
+            {"object": "person", "tag": "isdepicted"},
+        ],
     },
     {
         "id": 4,
         "image": "tag_q4.JPEG",
         "hint": "Look at the image carefully and determine which object needs an additional tag.",
-        "answer_object": "chair",
-        "answer_tag": "ishole",
+        "answers": [
+            {"object": "chair", "tag": "ishole"},
+            {"object": "laptop", "tag": "isreflected"},
+        ],
     },
     {
         "id": 5,
         "image": "tag_q5.JPEG",
         "hint": "Look at the image carefully and determine which object needs an additional tag.",
-        "answer_object": "cow",
-        "answer_tag": "iscrowd",
+        "answers": [
+            {"object": "cat", "tag": "isreflected"},
+        ],
     },
 ]
 
@@ -91,11 +97,12 @@ def restart_test():
     st.session_state.test_completed = False
     st.session_state.current_answers = {}
 
-def check_object_answer(user_answer, correct_answer):
+def check_answer(user_answer, correct_answer):
     return user_answer.strip().lower() == correct_answer.strip().lower()
 
-def check_tag_answer(user_answer, correct_answer):
-    return user_answer.strip().lower() == correct_answer.strip().lower()
+# Total number of answer pairs (for scoring)
+TOTAL_PAIRS = sum(len(q['answers']) for q in QUESTIONS)
+TOTAL_QUESTIONS = TOTAL_PAIRS * 2  # each pair has object + tag
 
 # Main App
 st.set_page_config(page_title="Tag Understanding Test", page_icon="🏷️", layout="wide")
@@ -175,7 +182,7 @@ if not st.session_state.test_started:
     - **Q2**: Select the appropriate tag for that object
     - Available tags: `ishole`, `iscrowd`, `isreflected`, `isdepicted`, `isthrough`
     - Click "Submit & Next" to proceed to the next question
-    - You need to score **80% (8/10)** to pass this test
+    - You need to score **80% (10/12)** to pass this test
     """)
 
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -210,41 +217,46 @@ elif st.session_state.test_started and not st.session_state.test_completed:
     with col2:
         st.subheader("Questions")
 
-        # Q1: Which object needs a tag?
-        obj_key = f"q{q_set['id']}_object"
-        st.markdown('<div class="question-box">', unsafe_allow_html=True)
-        st.write(f"**Q{(q_set['id'] - 1) * 2 + 1}. Which object in this image needs an additional tag?**")
-        st.caption("Enter in lowercase (must be a COCO category, e.g., person, car, dog)")
-        obj_answer = st.text_input(
-            "Your answer:",
-            value=st.session_state.current_answers.get(obj_key, ""),
-            key=f"input_{obj_key}",
-            placeholder="e.g., person"
-        )
-        st.session_state.current_answers[obj_key] = obj_answer
-        st.markdown('</div>', unsafe_allow_html=True)
+        num_answers = len(q_set['answers'])
+        for a_idx in range(num_answers):
+            if num_answers > 1:
+                st.markdown(f"---\n**Object {a_idx + 1} of {num_answers}**")
 
-        # Q2: Which tag should be added?
-        tag_key = f"q{q_set['id']}_tag"
-        st.markdown('<div class="question-box">', unsafe_allow_html=True)
-        st.write(f"**Q{(q_set['id'] - 1) * 2 + 2}. Which tag should be added to this object?**")
+            # Which object needs a tag?
+            obj_key = f"q{q_set['id']}_object_{a_idx}"
+            st.markdown('<div class="question-box">', unsafe_allow_html=True)
+            st.write(f"**Which object in this image needs an additional tag?**")
+            st.caption("Enter in lowercase (must be a COCO category, e.g., person, car, dog)")
+            obj_answer = st.text_input(
+                "Your answer:",
+                value=st.session_state.current_answers.get(obj_key, ""),
+                key=f"input_{obj_key}",
+                placeholder="e.g., person"
+            )
+            st.session_state.current_answers[obj_key] = obj_answer
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        default_index = None
-        if tag_key in st.session_state.current_answers:
-            try:
-                default_index = TAG_OPTIONS.index(st.session_state.current_answers[tag_key])
-            except ValueError:
-                default_index = None
+            # Which tag should be added?
+            tag_key = f"q{q_set['id']}_tag_{a_idx}"
+            st.markdown('<div class="question-box">', unsafe_allow_html=True)
+            st.write(f"**Which tag should be added to this object?**")
 
-        tag_answer = st.radio(
-            "Select the tag:",
-            TAG_OPTIONS,
-            index=default_index,
-            key=f"input_{tag_key}"
-        )
-        if tag_answer is not None:
-            st.session_state.current_answers[tag_key] = tag_answer
-        st.markdown('</div>', unsafe_allow_html=True)
+            default_index = None
+            if tag_key in st.session_state.current_answers:
+                try:
+                    default_index = TAG_OPTIONS.index(st.session_state.current_answers[tag_key])
+                except ValueError:
+                    default_index = None
+
+            tag_answer = st.radio(
+                "Select the tag:",
+                TAG_OPTIONS,
+                index=default_index,
+                key=f"input_{tag_key}"
+            )
+            if tag_answer is not None:
+                st.session_state.current_answers[tag_key] = tag_answer
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Navigation buttons
     st.divider()
@@ -286,55 +298,57 @@ elif st.session_state.test_completed:
         with col2:
             user_ans = st.session_state.user_answers.get(q_set['id'], {})
 
-            # Check object answer
-            obj_key = f"q{q_set['id']}_object"
-            user_obj = user_ans.get(obj_key, "No answer")
-            obj_correct = check_object_answer(str(user_obj), q_set['answer_object'])
-            total_questions += 1
-            if obj_correct:
-                correct_count += 1
+            for a_idx, answer_pair in enumerate(q_set['answers']):
+                if len(q_set['answers']) > 1:
+                    st.markdown(f"**Object {a_idx + 1} of {len(q_set['answers'])}**")
 
-            q_num_obj = (q_set['id'] - 1) * 2 + 1
-            if obj_correct:
-                st.markdown(f"""
-                <div class="success-box">
-                    <strong>Q{q_num_obj}. Which object needs a tag?</strong><br>
-                    ✅ Your answer: <strong>{user_obj}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="error-box">
-                    <strong>Q{q_num_obj}. Which object needs a tag?</strong><br>
-                    ❌ Your answer: <strong>{user_obj}</strong><br>
-                    ✓ Correct answer: <strong>{q_set['answer_object']}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+                # Check object answer
+                obj_key = f"q{q_set['id']}_object_{a_idx}"
+                user_obj = user_ans.get(obj_key, "No answer")
+                obj_correct = check_answer(str(user_obj), answer_pair['object'])
+                total_questions += 1
+                if obj_correct:
+                    correct_count += 1
 
-            # Check tag answer
-            tag_key = f"q{q_set['id']}_tag"
-            user_tag = user_ans.get(tag_key, "No answer")
-            tag_correct = check_tag_answer(str(user_tag), q_set['answer_tag'])
-            total_questions += 1
-            if tag_correct:
-                correct_count += 1
+                if obj_correct:
+                    st.markdown(f"""
+                    <div class="success-box">
+                        <strong>Which object needs a tag?</strong><br>
+                        ✅ Your answer: <strong>{user_obj}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="error-box">
+                        <strong>Which object needs a tag?</strong><br>
+                        ❌ Your answer: <strong>{user_obj}</strong><br>
+                        ✓ Correct answer: <strong>{answer_pair['object']}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            q_num_tag = (q_set['id'] - 1) * 2 + 2
-            if tag_correct:
-                st.markdown(f"""
-                <div class="success-box">
-                    <strong>Q{q_num_tag}. Which tag should be added?</strong><br>
-                    ✅ Your answer: <strong>{user_tag}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="error-box">
-                    <strong>Q{q_num_tag}. Which tag should be added?</strong><br>
-                    ❌ Your answer: <strong>{user_tag}</strong><br>
-                    ✓ Correct answer: <strong>{q_set['answer_tag']}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+                # Check tag answer
+                tag_key = f"q{q_set['id']}_tag_{a_idx}"
+                user_tag = user_ans.get(tag_key, "No answer")
+                tag_correct = check_answer(str(user_tag), answer_pair['tag'])
+                total_questions += 1
+                if tag_correct:
+                    correct_count += 1
+
+                if tag_correct:
+                    st.markdown(f"""
+                    <div class="success-box">
+                        <strong>Which tag should be added?</strong><br>
+                        ✅ Your answer: <strong>{user_tag}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="error-box">
+                        <strong>Which tag should be added?</strong><br>
+                        ❌ Your answer: <strong>{user_tag}</strong><br>
+                        ✓ Correct answer: <strong>{answer_pair['tag']}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
 
         st.divider()
 

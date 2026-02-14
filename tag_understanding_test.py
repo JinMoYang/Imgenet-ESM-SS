@@ -178,11 +178,6 @@ if not st.session_state.test_started:
     - You need to score **80% (8/10)** to pass this test
     """)
 
-    st.warning("""
-    ### 📁 Image Files Required
-    Make sure the following images are in the `./assets/tag_test/` directory:
-    """ + "\n".join([f"- `assets/tag_test/{q['image']}`" for q in QUESTIONS]))
-
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.button("Start Test", on_click=start_test, type="primary", use_container_width=True)
